@@ -32,7 +32,7 @@
     color: var(--dim); margin: 0; padding: 12px 14px; border-bottom: 1px solid var(--line);
   }
   .body { padding: 14px; }
-  /* The wallpaper is 1290x2796; shown at full width it buries the controls. */
+  /* The phone wallpaper is 1290x2796; shown at full width it buries the controls. */
   .preview { background: var(--bg); padding: 14px; display: flex; justify-content: center; }
   .preview svg { max-height: 58vh; width: auto; max-width: 100%; display: block; }
   table { width: 100%; border-collapse: collapse; }
@@ -127,11 +127,14 @@
       <h2>Layout</h2>
       <div class="body">
         <table>
+          <tr><td style="color:var(--dim)">Device</td><td>
+            <select id="device"><option value="phone">iPhone</option><option value="desktop">MacBook Pro 14″</option></select>
+          </td></tr>
           <tr><td style="color:var(--dim)">Shape</td><td>
             <select id="shape"><option value="circle">circle</option><option value="square">square</option></select>
           </td></tr>
           <tr><td style="color:var(--dim)">Top offset</td><td>
-            <input id="top" type="number" step="20" value="1180" style="width:90px"> px
+            <input id="top" type="number" step="20" style="width:90px"> px
           </td></tr>
           <tr><td style="color:var(--dim)">Preview date</td><td>
             <input id="today" type="date">
@@ -163,7 +166,7 @@
 </footer>
 
 <script type="module">
-import { renderSVG, DEFAULT_LAYOUT } from './calendar.mjs'
+import { renderSVG, DEVICES } from './calendar.mjs'
 
 const $ = (s) => document.querySelector(s)
 const todayISO = new Date().toISOString().slice(0, 10)
@@ -174,6 +177,8 @@ const state = {
     { date: `${todayISO.slice(0,4)}-12-25`, label: 'Christmas', emoji: '🎄', private: false },
   ],
   ranges: [],
+  // Each device keeps its own offset; the field shows whichever is previewed.
+  top: Object.fromEntries(Object.entries(DEVICES).map(([id, d]) => [id, d.layout.top])),
 }
 
 const sprites = {}
@@ -206,19 +211,14 @@ async function loadSprite(ch) {
 }
 
 function draw() {
-  const config = {
-    milestones: state.milestones.filter((m) => m.date),
-    ranges: state.ranges.filter((r) => r.start && r.end),
-  }
-  const layout = {
-    ...DEFAULT_LAYOUT,
-    top: Number($('#top').value) || DEFAULT_LAYOUT.top,
-    shape: $('#shape').value,
-  }
-  $('#preview').innerHTML = renderSVG({ todayStr: $('#today').value || todayISO, config, layout, sprites })
-
+  // The preview renders the exact config it hands you, so the two can't disagree.
   const json = { _example: false, years: [new Date().getUTCFullYear(), new Date().getUTCFullYear() + 1],
-                 layout: { top: layout.top, shape: layout.shape }, ...config }
+                 layout: { top: state.top.phone, shape: $('#shape').value },
+                 desktop: { layout: { top: state.top.desktop } },
+                 milestones: state.milestones.filter((m) => m.date),
+                 ranges: state.ranges.filter((r) => r.start && r.end) }
+  const device = $('#device').value
+  $('#preview').innerHTML = renderSVG({ todayStr: $('#today').value || todayISO, config: json, device, sprites })
   $('#b64').value = btoa(unescape(encodeURIComponent(JSON.stringify(json))))
 }
 
@@ -274,9 +274,16 @@ $('#dl').onclick = () => {
   a.href = URL.createObjectURL(blob); a.download = 'config.json'; a.click()
   URL.revokeObjectURL(a.href)
 }
-for (const id of ['#shape', '#top', '#today']) $(id).oninput = draw
+$('#device').oninput = () => { $('#top').value = state.top[$('#device').value]; draw() }
+$('#top').oninput = () => {
+  const device = $('#device').value
+  state.top[device] = Number($('#top').value) || DEVICES[device].layout.top
+  draw()
+}
+for (const id of ['#shape', '#today']) $(id).oninput = draw
 
 $('#today').value = todayISO
+$('#top').value = state.top.phone
 rowsM(); rowsR()
 state.milestones.forEach((m) => loadSprite(m.emoji))
 draw()

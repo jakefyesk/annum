@@ -1,10 +1,10 @@
 // Renders a year of wallpapers into dist/. Never commits anything; the workflow
 // hands dist/ straight to actions/upload-pages-artifact.
-import { Resvg } from '@resvg/resvg-js'
+import { renderAsync } from '@resvg/resvg-js'
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { renderSVG, DEFAULT_LAYOUT } from '../src/calendar.mjs'
+import { renderSVG, resolveDevice } from '../src/calendar.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -92,42 +92,66 @@ if (missing.length) {
 // Empty slug = published at /w/ directly.
 const SLUG = (process.env.ANNUM_SLUG ?? config.slug ?? '').replace(/[^a-zA-Z0-9_-]/g, '')
 
-const layout = { ...DEFAULT_LAYOUT, ...(config.layout ?? {}) }
 const years = config.years ?? [new Date().getUTCFullYear(), new Date().getUTCFullYear() + 1]
 
 const DIST = join(ROOT, 'dist')
 rmSync(DIST, { recursive: true, force: true })
 const outDir = join(DIST, 'w', SLUG)
-mkdirSync(outDir, { recursive: true })
 
-const t0 = Date.now()
-let n = 0
-let bytes = 0
+// The phone keeps the URL its Shortcut already points at. The desktop gets its
+// own folder beside it, and renders unless the config says `"desktop": false`.
+const devices = [
+  { device: 'phone', dir: outDir },
+  ...(config.desktop === false ? [] : [{ device: 'desktop', dir: join(outDir, 'desktop') }]),
+]
 
-for (const year of years) {
-  const start = Date.parse(`${year}-01-01T00:00:00Z`)
-  const end = Date.parse(`${year}-12-31T00:00:00Z`)
-  for (let t = start; t <= end; t += 86400000) {
-    const todayStr = new Date(t).toISOString().slice(0, 10)
-    const svg = renderSVG({ todayStr, config, layout, sprites })
-    const png = new Resvg(svg, {
-      fitTo: { mode: 'width', value: layout.width },
-      // fontDirs, not fontBuffers — fontBuffers re-parses the fonts on every
-      // construction and costs ~7x (355ms vs 50ms per render).
-      font: {
-        fontDirs: [join(ROOT, 'fonts')],
-        defaultFontFamily: 'JetBrains Mono',
-        loadSystemFonts: false,
-      },
-    })
-      .render()
-      .asPng()
-    writeFileSync(join(outDir, `${todayStr}.png`), png)
-    n++
-    bytes += png.length
+const jobs = []
+for (const { device, dir } of devices) {
+  const { layout } = resolveDevice(config, device)
+  mkdirSync(dir, { recursive: true })
+  for (const year of years) {
+    const start = Date.parse(`${year}-01-01T00:00:00Z`)
+    const end = Date.parse(`${year}-12-31T00:00:00Z`)
+    for (let t = start; t <= end; t += 86400000) {
+      jobs.push({ device, dir, width: layout.width, todayStr: new Date(t).toISOString().slice(0, 10) })
+    }
   }
 }
 
-console.log(`rendered ${n} days across ${years.join(', ')} in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
+const t0 = Date.now()
+let bytes = 0
+
+// renderAsync, not new Resvg().render(): the synchronous path never frees its
+// pixmap, which leaks ~15 MB per phone wallpaper and ~24 MB per desktop one —
+// a year of both is more memory than a runner has. The async path frees it,
+// and renders on libuv's thread pool, so a few days can go at once.
+let i = 0
+async function worker() {
+  while (i < jobs.length) {
+    const { device, dir, width, todayStr } = jobs[i++]
+    const svg = renderSVG({ todayStr, config, device, sprites })
+    const png = (
+      await renderAsync(svg, {
+        fitTo: { mode: 'width', value: width },
+        // fontDirs, not fontBuffers — fontBuffers re-parses the fonts on every
+        // construction and costs ~7x (355ms vs 50ms per render).
+        font: {
+          fontDirs: [join(ROOT, 'fonts')],
+          defaultFontFamily: 'JetBrains Mono',
+          loadSystemFonts: false,
+        },
+      })
+    ).asPng()
+    writeFileSync(join(dir, `${todayStr}.png`), png)
+    bytes += png.length
+  }
+}
+// libuv's thread pool holds four by default; more workers would only queue.
+await Promise.all(Array.from({ length: 4 }, worker))
+
+console.log(
+  `rendered ${jobs.length} wallpapers (${devices.map((d) => d.device).join(' + ')}) across ${years.join(', ')} ` +
+    `in ${((Date.now() - t0) / 1000).toFixed(1)}s`
+)
 console.log(`${(bytes / 1048576).toFixed(1)} MB before quantisation`)
-console.log(`published under /w/${SLUG || ''}`)
+console.log(`published under /w/${SLUG || ''}${devices.length > 1 ? ', the desktop in desktop/' : ''}`)

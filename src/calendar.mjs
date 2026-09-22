@@ -20,11 +20,8 @@ const esc = (s) =>
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 
-export const DEFAULT_LAYOUT = {
-  width: 1290,
-  height: 2796,
-  marginX: 96,
-  top: 1180,
+// How the calendar looks, whatever it's drawn on.
+const STYLE = {
   dotRatio: 0.62,
   markerScale: 1.2,
   shape: 'circle',
@@ -32,9 +29,51 @@ export const DEFAULT_LAYOUT = {
 
 export const DEFAULT_FOOTER = {
   showYear: true,
-  gap: 118,          // breathing room between the year count and the list
   maxMilestones: 12, // the list also self-limits to the space above safeBottom
-  safeBottom: 340,   // keep clear of the lock screen's bottom controls
+}
+
+// Every screen the calendar is drawn for, in that screen's own pixels. The type
+// and its spacing were drawn for the phone; `scale` sizes them for the others.
+export const DEVICES = {
+  // iPhone 14 Pro Max lock screen. 1180 clears the clock and widget stack.
+  phone: {
+    layout: { width: 1290, height: 2796, marginX: 96, top: 1180, scale: 1 },
+    footer: {
+      gap: 118,        // breathing room between the year count and the list
+      safeBottom: 340, // keep clear of the lock screen's bottom controls
+      columns: 1,
+    },
+  },
+  // MacBook Pro 14" at its native 3024x1964. The grid starts below the menu
+  // bar, the notch and the lock screen clock; the list stops above the Dock;
+  // the side margins leave the first column of desktop icons alone.
+  desktop: {
+    layout: { width: 3024, height: 1964, marginX: 256, top: 620, scale: 1.6 },
+    footer: { gap: 188, safeBottom: 260, columns: 3 },
+  },
+}
+
+// Settings that describe the look rather than the screen, so every device
+// inherits them from the top level. Everything else is per device: 1180px is a
+// sensible top on a phone and most of the way down a laptop.
+const SHARED = {
+  layout: ['shape', 'markerScale', 'dotRatio'],
+  footer: ['showYear', 'maxMilestones'],
+}
+
+// The phone reads the top-level `layout` and `footer`, as it always has. Any
+// other device reads the same two keys under its own name — `desktop.layout.top`
+// — and falls back to the top level only for SHARED settings.
+export function resolveDevice(config = {}, device = 'phone') {
+  const preset = DEVICES[device]
+  if (!preset) throw new Error(`unknown device "${device}" (expected ${Object.keys(DEVICES).join(' or ')})`)
+  const own = device === 'phone' ? config : (config[device] ?? {})
+  const shared = (key) =>
+    Object.fromEntries(SHARED[key].filter((k) => config[key]?.[k] !== undefined).map((k) => [k, config[key][k]]))
+  return {
+    layout: { ...STYLE, ...preset.layout, ...shared('layout'), ...own.layout },
+    footer: { ...DEFAULT_FOOTER, ...preset.footer, ...shared('footer'), ...own.footer },
+  }
 }
 
 function buildYear(year, today) {
@@ -85,10 +124,11 @@ function spriteFor(sprites, emoji) {
   return sprites[emoji] ?? sprites[bare] ?? sprites[bare + '\uFE0F'] ?? null
 }
 
-export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = {} }) {
-  const layout = { ...DEFAULT_LAYOUT, ...over }
-  const footer = { ...DEFAULT_FOOTER, ...(config.footer ?? {}) }
+export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {} }) {
+  const { layout, footer } = resolveDevice(config, device)
   const { width: W, height: H } = layout
+  // Type and spacing in phone pixels, scaled to this device.
+  const px = (v) => Math.round(v * layout.scale * 10) / 10
   const year = Number(todayStr.slice(0, 4))
   const today = utc(todayStr)
   const redactAll = config.redactLabels === true
@@ -122,9 +162,9 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
   for (let m = 0; m < 12; m++) {
     const d = byDate.get(`${year}-${String(m + 1).padStart(2, '0')}-01`)
     const x = x0 + d.col * pitch
-    out.push(`<rect x="${(x - 1).toFixed(1)}" y="${y0 - 34}" width="2" height="12" fill="${THEME.future}"/>`)
+    out.push(`<rect x="${(x - px(1)).toFixed(1)}" y="${y0 - px(34)}" width="${px(2)}" height="${px(12)}" fill="${THEME.future}"/>`)
     out.push(
-      `<text x="${x.toFixed(1)}" y="${y0 - 46}" font-family="JetBrains Mono" font-weight="500" font-size="17" letter-spacing="1.5" fill="${THEME.label}" text-anchor="middle">${MONTHS[m]}</text>`
+      `<text x="${x.toFixed(1)}" y="${y0 - px(46)}" font-family="JetBrains Mono" font-weight="500" font-size="${px(17)}" letter-spacing="${px(1.5)}" fill="${THEME.label}" text-anchor="middle">${MONTHS[m]}</text>`
     )
   }
 
@@ -166,7 +206,7 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
   // The year count leads, then the full milestone list in calendar order.
 
   const daysTo = (m) => Math.round((utc(m.date) - today) / DAY)
-  let y = y0 + gridH + 74
+  let y = y0 + gridH + px(74)
 
   // The year countdown sits directly under the grid and carries the most
   // weight, so a milestone's number can never be mistaken for it.
@@ -178,16 +218,16 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
     const big = String(daysLeft)
 
     out.push(
-      `<text x="${left.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="68" letter-spacing="-2" fill="${THEME.past}">${big}</text>`
+      `<text x="${left.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="${px(68)}" letter-spacing="${px(-2)}" fill="${THEME.past}">${big}</text>`
     )
-    const tx = left + big.length * 41 + 16
+    const tx = left + big.length * px(41) + px(16)
     out.push(
-      `<text x="${tx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="28" letter-spacing="3" fill="${THEME.past}">DAYS LEFT</text>`
+      `<text x="${tx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="${px(28)}" letter-spacing="${px(3)}" fill="${THEME.past}">DAYS LEFT</text>`
     )
     // Same baseline, opposite edge: the year and percentage read as context for
     // the count rather than as a second line of it.
     out.push(
-      `<text x="${right.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${THEME.dim}" text-anchor="end">IN ${year} · ${pct}%</text>`
+      `<text x="${right.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="${px(24)}" letter-spacing="${px(3)}" fill="${THEME.dim}" text-anchor="end">IN ${year} · ${pct}%</text>`
     )
     y += footer.gap
   }
@@ -199,33 +239,53 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
     .filter((m) => m.date?.startsWith(String(year)))
     .sort((a, b) => utc(a.date) - utc(b.date))
 
-  const ROW = 46
+  // A wide screen splits the list into columns, filled top to bottom and then
+  // left to right, so each column still reads in calendar order. They're filled
+  // as evenly as possible, earlier columns taking the remainder, so four items
+  // across three columns span the width rather than leaving the last one empty.
+  const ROW = px(46)
+  const listCols = Math.max(1, Math.floor(footer.columns))
   const room = Math.max(0, Math.floor((layout.height - footer.safeBottom - y) / ROW))
-  const shown = all.slice(0, Math.min(room, footer.maxMilestones))
+  const shown = all.slice(0, Math.min(room * listCols, footer.maxMilestones))
+  const perCol = Math.floor(shown.length / listCols)
+  const extra = shown.length % listCols
+  const colW = (right - left) / listCols
 
-  // No markers here — the emoji live in the grid, where they mark a position.
-  // Repeating them down the list just adds colour the list doesn't need.
-  const COUNT_RIGHT = left + 96
-  const LABEL_LEFT = left + 124
+  // Labels stop at their column's edge, less a gutter where another column
+  // follows. JetBrains Mono advances 0.6em per glyph, plus the letter-spacing.
+  const fit = Math.floor((colW - px(124) - (listCols > 1 ? px(40) : 0)) / (px(24) * 0.6 + px(3)))
+  const clip = (s) => {
+    const chars = [...s]
+    return chars.length > fit ? chars.slice(0, Math.max(0, fit - 1)).join('').trimEnd() + '…' : s
+  }
 
-  for (const m of shown) {
-    const n = daysTo(m)
-    const past = n < 0
-    const tone = past ? THEME.dim : THEME.label
+  for (let c = 0; c < listCols; c++) {
+    // No markers here — the emoji live in the grid, where they mark a position.
+    // Repeating them down the list just adds colour the list doesn't need.
+    const COUNT_RIGHT = left + c * colW + px(96)
+    const LABEL_LEFT = left + c * colW + px(124)
+    let row = y
 
-    // Right-align the counts so the column reads as a column.
-    const count = n === 0 ? 'TODAY' : String(n)
-    out.push(
-      `<text x="${COUNT_RIGHT.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="${n === 0 ? 700 : 500}" font-size="28" letter-spacing="0" fill="${n === 0 ? THEME.today : tone}" text-anchor="end">${count}</text>`
-    )
+    const from = c * perCol + Math.min(c, extra)
+    for (const m of shown.slice(from, from + perCol + (c < extra ? 1 : 0))) {
+      const n = daysTo(m)
+      const past = n < 0
+      const tone = past ? THEME.dim : THEME.label
 
-    const lbl = publicLabel(m, redactAll)
-    if (lbl) {
+      // Right-align the counts so the column reads as a column.
+      const count = n === 0 ? 'TODAY' : String(n)
       out.push(
-        `<text x="${LABEL_LEFT.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${tone}" opacity="${past ? 0.75 : 1}">${esc(lbl.toUpperCase())}</text>`
+        `<text x="${COUNT_RIGHT.toFixed(1)}" y="${row}" font-family="JetBrains Mono" font-weight="${n === 0 ? 700 : 500}" font-size="${px(28)}" letter-spacing="0" fill="${n === 0 ? THEME.today : tone}" text-anchor="end">${count}</text>`
       )
+
+      const lbl = publicLabel(m, redactAll)
+      if (lbl) {
+        out.push(
+          `<text x="${LABEL_LEFT.toFixed(1)}" y="${row}" font-family="JetBrains Mono" font-weight="500" font-size="${px(24)}" letter-spacing="${px(3)}" fill="${tone}" opacity="${past ? 0.75 : 1}">${esc(clip(lbl.toUpperCase()))}</text>`
+        )
+      }
+      row += ROW
     }
-    y += ROW
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${out.join('')}</svg>`
