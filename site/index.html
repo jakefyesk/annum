@@ -272,7 +272,9 @@ $('#copy').onclick = async () => {
   setTimeout(() => ($('#copy').textContent = 'Copy'), 1400)
 }
 $('#dl').onclick = () => {
-  const blob = new Blob([atob($('#b64').value)], { type: 'application/json' })
+  // atob gives one char per UTF-8 byte; a Blob would encode each again.
+  const bytes = Uint8Array.from(atob($('#b64').value), (c) => c.charCodeAt(0))
+  const blob = new Blob([bytes], { type: 'application/json' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob); a.download = 'config.json'; a.click()
   URL.revokeObjectURL(a.href)

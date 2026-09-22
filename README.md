@@ -110,10 +110,12 @@ conversation — "add the marathon on 1 November" is enough.
 
 1. **Build your config.** Open the Pages site, add milestones and ranges, and
    watch the preview. The page is static and sends nothing anywhere.
-2. **Store it.** Copy the base64 blob into `Settings → Secrets and variables →
-   Actions → Variables`, named `ANNUM_CONFIG` — a variable, not a secret, so it
-   can be read back and edited later. Then add `ANNUM_SLUG` as a *secret*
-   (`openssl rand -hex 16`) to move the wallpapers off a guessable URL.
+2. **Store it.** Save the downloaded JSON as `config.json` and run
+   `node scripts/events.mjs push`, which writes the `ANNUM_CONFIG` secret that
+   CI reads and the variable that mirrors it (see Privacy). By hand, paste the
+   base64 blob into `Settings → Secrets and variables → Actions` as both.
+   Then add `ANNUM_SLUG` as a *secret* (`openssl rand -hex 16`) to move the
+   wallpapers off a guessable URL.
 3. **Deploy.** `Settings → Pages → Source: GitHub Actions`, then run the workflow.
 4. **Automate the phone.** Shortcuts → Automation → Time of Day, 6:00 AM, Daily,
    Run Immediately → Create New Shortcut:
