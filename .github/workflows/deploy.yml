@@ -11,7 +11,6 @@ permissions:
   contents: read
   pages: write
   id-token: write
-  actions: read   # to read the ANNUM_CONFIG variable at runtime
 
 concurrency:
   group: pages
@@ -34,26 +33,17 @@ jobs:
       - name: Guard against personal data in the repo
         run: npm run guard
 
-      # Fetched at runtime, never interpolated into the workflow. Anything
-      # passed through a step's `env:` or `run:` is printed verbatim in the log
-      # by the runner itself, and this repo's logs are public — a variable is
-      # not masked the way a secret is. add-mask covers it for everything after.
-      - name: Load config
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          value=$(gh api "repos/$GITHUB_REPOSITORY/actions/variables/ANNUM_CONFIG" --jq .value 2>/dev/null || true)
-          if [ -z "$value" ]; then
-            echo "ANNUM_CONFIG variable not set or unreadable; falling back to the example"
-          else
-            echo "::add-mask::$value"
-            echo "ANNUM_CONFIG=$value" >> "$GITHUB_ENV"
-            echo "loaded config ($(printf %s "$value" | wc -c) bytes, masked)"
-          fi
-
       - name: Build
         env:
-          # The slug is a secret, so the runner masks it in the env block.
+          # Read from the SECRET, not the variable. The runner prints a step's
+          # env: block verbatim, and only secrets are masked there — a variable
+          # would land in this repo's public logs in clear base64.
+          #
+          # scripts/events.mjs writes the secret and the variable together: the
+          # secret is what CI consumes, the variable is the readable mirror that
+          # makes the config editable in conversation, since secrets are
+          # write-only. Always edit through that script so the two can't drift.
+          ANNUM_CONFIG: ${{ secrets.ANNUM_CONFIG }}
           ANNUM_SLUG: ${{ secrets.ANNUM_SLUG }}
         run: npm run build
 

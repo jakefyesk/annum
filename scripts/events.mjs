@@ -35,6 +35,13 @@ function read() {
   }
 }
 
+// Two stores, written together and never separately:
+//   secret   — what CI reads, because the runner masks secrets in the env block
+//              it prints, and this repo's logs are public
+//   variable — the readable mirror, because secrets are write-only and there is
+//              otherwise no way to answer "what's on the calendar right now?"
+// Splitting them is the price of a public repo; writing both here is what keeps
+// them honest.
 function write(config) {
   delete config._example
   delete config._readme
@@ -42,6 +49,7 @@ function write(config) {
   // gh reads the value from stdin when --body is omitted, which keeps it off
   // the process list and out of shell history.
   gh(['variable', 'set', VAR], b64)
+  gh(['secret', 'set', VAR], b64)
   writeFileSync(LOCAL, JSON.stringify(config, null, 2) + '\n')
 }
 

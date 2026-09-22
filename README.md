@@ -50,13 +50,25 @@ differently:
 
 | | Store | Why |
 |---|---|---|
-| `ANNUM_SLUG` | secret | The only thing keeping wallpapers off a guessable URL, so it must stay masked in logs |
-| `ANNUM_CONFIG` | variable | Readable, so events can be edited conversationally. Its contents are largely inferable from the image anyway |
+| `ANNUM_SLUG` | secret | The only thing keeping wallpapers off a guessable URL |
+| `ANNUM_CONFIG` | secret **and** variable | The secret is what CI reads; the variable is the readable mirror |
 
-Variables are **not** masked in Actions logs the way secrets are, and this repo's
-logs are public. That is why the config is base64-encoded: not as encryption —
-it isn't any — but so a stray trace prints a blob rather than your calendar.
-Never echo `ANNUM_CONFIG`, and never enable shell tracing in the build job.
+The config is deliberately in both stores, because neither alone works on a
+public repo:
+
+- **The runner prints every step's `env:` block into the log**, and only secrets
+  are masked there. A variable would publish your calendar in clear base64 on
+  every single build. This is not hypothetical — it happened once here, and the
+  run had to be deleted.
+- **Secrets are write-only.** There is no way to read one back, so a secret
+  alone makes "what's on the calendar right now?" unanswerable, and
+  conversational editing impossible.
+
+`scripts/events.mjs` writes both in one step. Always edit through it, or the two
+will drift and CI will quietly render something other than what you can read.
+
+The base64 is not encryption and never was — it only means a stray trace prints
+a blob instead of prose. Don't rely on it.
 
 For label-level control, `"private": true` on a milestone keeps its marker and
 countdown but drops the words from the image; `"redactLabels": true` does that

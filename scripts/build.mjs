@@ -12,7 +12,16 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 // gitignored config.json when you're iterating. Never from a tracked file.
 function loadConfig() {
   if (process.env.ANNUM_CONFIG) {
-    return JSON.parse(Buffer.from(process.env.ANNUM_CONFIG, 'base64').toString('utf8'))
+    const decoded = Buffer.from(process.env.ANNUM_CONFIG, 'base64').toString('utf8')
+    try {
+      return JSON.parse(decoded)
+    } catch {
+      // Fail loudly. A malformed value once turned out to be a captured API
+      // error body, which decoded to binary and produced a useless stack trace.
+      console.error('ANNUM_CONFIG is set but is not base64-encoded JSON.')
+      console.error(`decoded to ${decoded.length} bytes starting: ${JSON.stringify(decoded.slice(0, 60))}`)
+      process.exit(1)
+    }
   }
   try {
     return JSON.parse(readFileSync(join(ROOT, 'config.json'), 'utf8'))
