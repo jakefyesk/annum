@@ -11,6 +11,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read   # to read the ANNUM_CONFIG variable at runtime
 
 concurrency:
   group: pages
@@ -33,19 +34,26 @@ jobs:
       - name: Guard against personal data in the repo
         run: npm run guard
 
+      # Fetched at runtime, never interpolated into the workflow. Anything
+      # passed through a step's `env:` or `run:` is printed verbatim in the log
+      # by the runner itself, and this repo's logs are public — a variable is
+      # not masked the way a secret is. add-mask covers it for everything after.
+      - name: Load config
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          value=$(gh api "repos/$GITHUB_REPOSITORY/actions/variables/ANNUM_CONFIG" --jq .value 2>/dev/null || true)
+          if [ -z "$value" ]; then
+            echo "ANNUM_CONFIG variable not set or unreadable; falling back to the example"
+          else
+            echo "::add-mask::$value"
+            echo "ANNUM_CONFIG=$value" >> "$GITHUB_ENV"
+            echo "loaded config ($(printf %s "$value" | wc -c) bytes, masked)"
+          fi
+
       - name: Build
         env:
-          # A variable, not a secret, so it can be read back and edited
-          # conversationally. Its contents are largely inferable from the
-          # published wallpaper anyway — see README → Privacy.
-          #
-          # But variables are NOT masked in logs the way secrets are, and this
-          # repo's logs are public, so the base64 is load-bearing here: it is
-          # what stands between a stray trace and a readable calendar. Never
-          # echo it, and never turn on shell tracing in this job.
-          ANNUM_CONFIG: ${{ vars.ANNUM_CONFIG }}
-          # The slug stays a secret. It is the only thing keeping the
-          # wallpapers off a guessable URL, so it must be masked.
+          # The slug is a secret, so the runner masks it in the env block.
           ANNUM_SLUG: ${{ secrets.ANNUM_SLUG }}
         run: npm run build
 
