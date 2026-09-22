@@ -1,0 +1,11 @@
+node_modules/
+dist/
+
+# Personal config never enters the repo — it lives in the ANNUM_CONFIG secret.
+config.json
+*.local.json
+.env
+.env.*
+site/preview-config.json
+
+.DS_Store

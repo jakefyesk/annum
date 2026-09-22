@@ -1,0 +1,60 @@
+name: build & deploy
+
+# No schedule. Every day of the year is rendered ahead of time and the phone
+# picks today's file, so there is nothing for a cron job to keep up to date.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Second line of defence: the pre-commit hook can be bypassed, this cannot.
+      - name: Guard against personal data in the repo
+        run: npm run guard
+
+      - name: Build
+        env:
+          # Base64 so no raw date or label can surface in a log line even if
+          # something decides to print its environment.
+          ANNUM_CONFIG: ${{ secrets.ANNUM_CONFIG }}
+          ANNUM_SLUG: ${{ secrets.ANNUM_SLUG }}
+        run: npm run build
+
+      - name: Check nothing personal leaked into the payload
+        run: node scripts/verify-dist.mjs
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

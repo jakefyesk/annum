@@ -1,0 +1,17 @@
+{
+  "_example": true,
+  "_readme": "Copy this shape into the ANNUM_CONFIG secret (base64). Never commit a filled-in version.",
+  "years": [2026, 2027],
+  "slug": "",
+  "redactLabels": false,
+  "layout": { "top": 1180, "shape": "circle" },
+  "milestones": [
+    { "date": "2026-12-25", "label": "Christmas", "emoji": "🎄" },
+    { "date": "2026-10-31", "label": "Halloween", "emoji": "🎃" },
+    { "date": "2026-11-01", "label": "Marathon", "emoji": "🏃" },
+    { "date": "2026-07-04", "private": true, "publicLabel": "Countdown", "emoji": "🎃" }
+  ],
+  "ranges": [
+    { "start": "2026-12-20", "end": "2026-12-31", "color": "#3D7EFF" }
+  ]
+}
