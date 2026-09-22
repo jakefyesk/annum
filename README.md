@@ -125,20 +125,20 @@ conversation — "add the marathon on 1 November" is enough.
      *Crop to Subject* and *Show Preview*, or iOS will crop the image and ask for
      confirmation every morning.
 5. **Automate the Mac.** Download [`mac/annum.sh`](mac/annum.sh) and run
-   `sh annum.sh install`. Paste your desktop URL when it asks — the phone URL
-   with `/desktop` on the end, no date:
+   `sh annum.sh install`. When it asks, paste the phone's wallpaper URL — with
+   or without a date — and it finds the desktop images beside it:
 
    ```
-   https://<user>.github.io/annum/w/<slug>/desktop
+   https://<user>.github.io/annum/w/<slug>
    ```
 
    It checks today's image exists, then installs a LaunchAgent that sets the
    desktop picture on login and every hour after. A Mac asleep at midnight
    catches up when it wakes. It sets the picture through NSWorkspace rather than
-   System Events, so there is no permission prompt. macOS only changes the Space
-   in front of each display, so other Spaces update when they're in front for a
-   run. The log is `~/Library/Logs/annum.log`, and `sh annum.sh uninstall`
-   removes everything.
+   System Events, so there is no permission prompt — only the usual *Background
+   Items Added* notice. macOS only changes the Space in front of each display,
+   so other Spaces update when they're in front for a run. The log is
+   `~/Library/Logs/annum.log`, and `sh annum.sh uninstall` removes everything.
 
 ## Config
 
@@ -169,8 +169,8 @@ pitch.
 
 `desktop` takes the same `layout` and `footer` keys for the Mac wallpaper, in its
 own pixels. Only the look carries over from the top level — `shape`,
-`markerScale`, `showYear`, `maxMilestones` — because a phone's `top` of 1180 is
-most of the way down a laptop screen. The defaults put the grid below the menu
+`markerScale`, `dotRatio`, `showYear`, `maxMilestones` — because a phone's `top`
+of 1180 is most of the way down a laptop screen. The defaults put the grid below the menu
 bar, the notch and the lock screen clock, and stop the milestone list, split into
 three columns, above the Dock. Set `"desktop": false` to render only the phone.
 

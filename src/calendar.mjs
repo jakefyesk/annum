@@ -244,26 +244,32 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   // as evenly as possible, earlier columns taking the remainder, so four items
   // across three columns span the width rather than leaving the last one empty.
   const ROW = px(46)
-  const listCols = Math.max(1, Math.floor(footer.columns))
+  // Anything but a positive number means one column. JSON's 1e400 is Infinity.
+  const asked = Math.floor(Number(footer.columns))
+  const listCols = Number.isFinite(asked) ? Math.max(1, asked) : 1
   const room = Math.max(0, Math.floor((layout.height - footer.safeBottom - y) / ROW))
   const shown = all.slice(0, Math.min(room * listCols, footer.maxMilestones))
+  const used = Math.min(listCols, shown.length)
   const perCol = Math.floor(shown.length / listCols)
   const extra = shown.length % listCols
   const colW = (right - left) / listCols
 
-  // Labels stop at their column's edge, less a gutter where another column
-  // follows. JetBrains Mono advances 0.6em per glyph, plus the letter-spacing.
-  const fit = Math.floor((colW - px(124) - (listCols > 1 ? px(40) : 0)) / (px(24) * 0.6 + px(3)))
-  const clip = (s) => {
-    const chars = [...s]
+  // A label stops a gutter short of the next column, or at the grid's edge when
+  // no column follows it. JetBrains Mono advances 0.6em per glyph plus the
+  // letter-spacing, which the last glyph doesn't need. Composed characters are
+  // what's counted, so a decomposed é isn't charged two cells.
+  const clip = (s, width) => {
+    const fit = Math.floor((width + px(3)) / (px(24) * 0.6 + px(3)))
+    const chars = [...s.normalize('NFC')]
     return chars.length > fit ? chars.slice(0, Math.max(0, fit - 1)).join('').trimEnd() + '…' : s
   }
 
-  for (let c = 0; c < listCols; c++) {
+  for (let c = 0; c < used; c++) {
     // No markers here — the emoji live in the grid, where they mark a position.
     // Repeating them down the list just adds colour the list doesn't need.
     const COUNT_RIGHT = left + c * colW + px(96)
     const LABEL_LEFT = left + c * colW + px(124)
+    const labelWidth = (c === used - 1 ? right - left - c * colW : colW - px(40)) - px(124)
     let row = y
 
     const from = c * perCol + Math.min(c, extra)
@@ -281,7 +287,7 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
       const lbl = publicLabel(m, redactAll)
       if (lbl) {
         out.push(
-          `<text x="${LABEL_LEFT.toFixed(1)}" y="${row}" font-family="JetBrains Mono" font-weight="500" font-size="${px(24)}" letter-spacing="${px(3)}" fill="${tone}" opacity="${past ? 0.75 : 1}">${esc(clip(lbl.toUpperCase()))}</text>`
+          `<text x="${LABEL_LEFT.toFixed(1)}" y="${row}" font-family="JetBrains Mono" font-weight="500" font-size="${px(24)}" letter-spacing="${px(3)}" fill="${tone}" opacity="${past ? 0.75 : 1}">${esc(clip(lbl.toUpperCase(), labelWidth))}</text>`
         )
       }
       row += ROW

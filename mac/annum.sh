@@ -7,7 +7,8 @@
 #   sh annum.sh uninstall
 #   sh annum.sh run URL         # what the LaunchAgent runs
 #
-# URL is your desktop folder: https://<user>.github.io/annum/w/<slug>/desktop
+# URL is your wallpaper folder, https://<user>.github.io/annum/w/<slug>, or any
+# image in it — the phone's or the desktop's. The desktop folder is found from it.
 set -eu
 
 LABEL=io.github.annum.desktop
@@ -38,10 +39,20 @@ cmd_run() {
   mkdir -p "$DIR"
 
   if [ ! -s "$file" ]; then
-    # The retries cover waking from sleep before the network is back.
-    if ! curl -fsS --retry 5 --retry-delay 30 --retry-all-errors -o "$file.part" "$base/$today.png"; then
+    # The retries cover waking from sleep before the network is back. -L
+    # because Pages redirects github.io to a custom domain when the account has
+    # one; without it curl saves the redirect page and exits 0.
+    if ! curl -fsSL --proto-redir =https --retry 5 --retry-delay 30 --retry-all-errors \
+      -o "$file.part" "$base/$today.png"; then
       rm -f "$file.part"
       echo "$(date '+%F %T') could not fetch $today.png" >&2
+      exit 1
+    fi
+    # Anything that isn't a PNG would become the default wallpaper and stay
+    # that way all day, since the file exists and is never fetched again.
+    if [ "$(dd if="$file.part" bs=1 skip=1 count=3 2>/dev/null)" != PNG ]; then
+      rm -f "$file.part"
+      echo "$(date '+%F %T') $today.png is not a PNG" >&2
       exit 1
     fi
     mv "$file.part" "$file"
@@ -54,7 +65,8 @@ cmd_run() {
 
   # Keep a week. Spaces that weren't in front during a run still point at an
   # older file, and a deleted one turns into the default wallpaper on login.
-  find "$DIR" -name '????-??-??.png' -mtime +7 -delete
+  # The trailing * catches a .part left by a download killed at logout.
+  find "$DIR" -name '????-??-??.png*' -mtime +7 -delete
 }
 
 cmd_install() {
@@ -62,12 +74,15 @@ cmd_install() {
   if [ -z "$url" ]; then
     # Prompted rather than required on the command line, so the slug stays
     # out of shell history.
-    printf 'Desktop wallpaper URL (https://<user>.github.io/annum/w/<slug>/desktop): '
-    read -r url
+    printf 'Wallpaper URL (https://<user>.github.io/annum/w/<slug>): '
+    # EOF, or a piped URL with no newline, falls through to the checks below.
+    read -r url || :
   fi
-  # Accept a pasted image URL too, and drop any trailing slash.
+  # Accept the phone's URL, which is the one to hand, or the desktop's, with or
+  # without a date; the build always puts the desktop in desktop/ beside it.
   case $url in *.png) url=${url%/*} ;; esac
   url=${url%/}
+  case $url in */desktop) ;; *) url=$url/desktop ;; esac
   # Also keeps the plist below well-formed without escaping anything.
   case $url in
     https://*[!A-Za-z0-9:/._~-]*) echo "unexpected characters in $url" >&2; exit 1 ;;
@@ -77,7 +92,7 @@ cmd_install() {
 
   # Fail here, with a reason, rather than quietly every hour.
   today=$(date +%F)
-  if ! curl -fsSI -o /dev/null "$url/$today.png"; then
+  if ! curl -fsSIL --proto-redir =https -o /dev/null "$url/$today.png"; then
     echo "couldn't fetch $today.png from that URL." >&2
     echo "Check the slug, and that the workflow has deployed since desktop support was added." >&2
     exit 1
@@ -111,14 +126,23 @@ cmd_install() {
 </plist>
 EOF
 
-  launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-  launchctl bootstrap "gui/$(id -u)" "$PLIST"
-  echo "installed. Today's wallpaper should appear in a moment; the log is $LOG"
+  # bootout can return before a running job has unloaded, and bootstrapping
+  # over it fails with a bare "Bootstrap failed: 5", so wait for it to go.
+  uid=$(id -u)
+  launchctl bootout "gui/$uid/$LABEL" 2>/dev/null || true
+  n=0
+  while launchctl print "gui/$uid/$LABEL" >/dev/null 2>&1 && [ $n -lt 20 ]; do
+    sleep 0.5
+    n=$((n + 1))
+  done
+  launchctl bootstrap "gui/$uid" "$PLIST"
+  echo "installed for $url"
+  echo "Today's wallpaper should appear in a moment; the log is $LOG"
 }
 
 cmd_uninstall() {
   launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-  rm -f "$PLIST"
+  rm -f "$PLIST" "$LOG"
   rm -rf "$DIR"
   echo "uninstalled. Pick a new picture in System Settings → Wallpaper."
 }
@@ -127,5 +151,5 @@ case ${1:-} in
   run) shift; cmd_run "$@" ;;
   install) shift; cmd_install "$@" ;;
   uninstall) cmd_uninstall ;;
-  *) sed -n '2,10p' "$0" >&2; exit 1 ;;
+  *) sed -n '2,11p' "$0" >&2; exit 1 ;;
 esac

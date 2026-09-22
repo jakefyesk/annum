@@ -130,18 +130,20 @@ async function worker() {
   while (i < jobs.length) {
     const { device, dir, width, todayStr } = jobs[i++]
     const svg = renderSVG({ todayStr, config, device, sprites })
-    const png = (
-      await renderAsync(svg, {
-        fitTo: { mode: 'width', value: width },
-        // fontDirs, not fontBuffers — fontBuffers re-parses the fonts on every
-        // construction and costs ~7x (355ms vs 50ms per render).
-        font: {
-          fontDirs: [join(ROOT, 'fonts')],
-          defaultFontFamily: 'JetBrains Mono',
-          loadSystemFonts: false,
-        },
-      })
-    ).asPng()
+    const image = await renderAsync(svg, {
+      fitTo: { mode: 'width', value: width },
+      // fontDirs, not fontBuffers — fontBuffers re-parses the fonts on every
+      // construction and costs ~7x (355ms vs 50ms per render).
+      font: {
+        fontDirs: [join(ROOT, 'fonts')],
+        defaultFontFamily: 'JetBrains Mono',
+        loadSystemFonts: false,
+      },
+    }).catch((e) => {
+      // The async error carries no stack worth reading, so say which image.
+      throw new Error(`rendering ${device} ${todayStr}: ${e.message}`)
+    })
+    const png = image.asPng()
     writeFileSync(join(dir, `${todayStr}.png`), png)
     bytes += png.length
   }

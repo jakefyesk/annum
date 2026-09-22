@@ -24,17 +24,20 @@
   }
   h1 { font-size: 15px; font-weight: 700; letter-spacing: 4px; margin: 0; text-transform: uppercase; }
   .tag { color: var(--dim); letter-spacing: 1px; }
+  /* minmax(0, …) lets a column shrink below its widest table, so the landscape
+     preview fits a phone screen and the milestone table scrolls in its panel. */
   main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; display: grid; gap: 28px; }
-  @media (min-width: 900px) { main { grid-template-columns: 1fr 380px; align-items: start; } }
+  main, main > div { grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) { main { grid-template-columns: minmax(0, 1fr) 380px; align-items: start; } }
   section { border: 1px solid var(--line); background: var(--panel); }
   h2 {
     font-size: 11px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase;
     color: var(--dim); margin: 0; padding: 12px 14px; border-bottom: 1px solid var(--line);
   }
-  .body { padding: 14px; }
+  .body { padding: 14px; overflow-x: auto; }
   /* The phone wallpaper is 1290x2796; shown at full width it buries the controls. */
   .preview { background: var(--bg); padding: 14px; display: flex; justify-content: center; }
-  .preview svg { max-height: 58vh; width: auto; max-width: 100%; display: block; }
+  .preview svg { max-height: 58vh; width: auto; height: auto; max-width: 100%; display: block; }
   table { width: 100%; border-collapse: collapse; }
   th {
     text-align: left; font-weight: 500; font-size: 10px; letter-spacing: 2px;
@@ -128,13 +131,13 @@
       <div class="body">
         <table>
           <tr><td style="color:var(--dim)">Device</td><td>
-            <select id="device"><option value="phone">iPhone</option><option value="desktop">MacBook Pro 14″</option></select>
+            <select id="device" autocomplete="off"><option value="phone">iPhone</option><option value="desktop">MacBook Pro 14″</option></select>
           </td></tr>
           <tr><td style="color:var(--dim)">Shape</td><td>
             <select id="shape"><option value="circle">circle</option><option value="square">square</option></select>
           </td></tr>
           <tr><td style="color:var(--dim)">Top offset</td><td>
-            <input id="top" type="number" step="20" style="width:90px"> px
+            <input id="top" type="number" step="20" autocomplete="off" style="width:90px"> px
           </td></tr>
           <tr><td style="color:var(--dim)">Preview date</td><td>
             <input id="today" type="date">
@@ -280,10 +283,12 @@ $('#top').oninput = () => {
   state.top[device] = Number($('#top').value) || DEVICES[device].layout.top
   draw()
 }
+// Once editing ends, show the offset actually in use, not a cleared or 0 field.
+$('#top').onchange = () => { $('#top').value = state.top[$('#device').value] }
 for (const id of ['#shape', '#today']) $(id).oninput = draw
 
 $('#today').value = todayISO
-$('#top').value = state.top.phone
+$('#top').value = state.top[$('#device').value]
 rowsM(); rowsR()
 state.milestones.forEach((m) => loadSprite(m.emoji))
 draw()
