@@ -31,8 +31,10 @@ export const DEFAULT_LAYOUT = {
 }
 
 export const DEFAULT_FOOTER = {
-  upcoming: 3, // how many further milestones get their own countdown
   showYear: true,
+  gap: 118,          // breathing room between the year count and the list
+  maxMilestones: 12, // the list also self-limits to the space above safeBottom
+  safeBottom: 340,   // keep clear of the lock screen's bottom controls
 }
 
 function buildYear(year, today) {
@@ -71,6 +73,16 @@ function spriteTag(art, x, y, size, opacity = 1) {
     return `<svg x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" viewBox="${vb}" opacity="${opacity}">${inner}</svg>`
   }
   return `<image x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" href="${esc(art)}" opacity="${opacity}"/>`
+}
+
+// Sprite keys come from filenames, which carry neither variation selectors nor
+// skin-tone modifiers, while config emoji usually do. Normalising here keeps CI
+// and the browser preview from disagreeing about whether a sprite exists.
+const SKIN_TONE = /[\u{1F3FB}-\u{1F3FF}]/gu
+function spriteFor(sprites, emoji) {
+  if (!emoji) return null
+  const bare = emoji.replace(SKIN_TONE, '').replace(/\uFE0F/g, '')
+  return sprites[emoji] ?? sprites[bare] ?? sprites[bare + '\uFE0F'] ?? null
 }
 
 export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = {} }) {
@@ -142,7 +154,7 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
   for (const { d, cx, cy } of markers) {
     const m = d.milestone
     const size = pitch * layout.markerScale
-    const art = m.emoji ? sprites[m.emoji] : null
+    const art = spriteFor(sprites, m.emoji)
     out.push(
       art
         ? spriteTag(art, cx - size / 2, cy - size / 2, size, d.state === 'past' ? 0.45 : 1)
@@ -151,83 +163,70 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
   }
 
   // ---- Footer -------------------------------------------------------------
-  // Three tiers, so a milestone countdown never reads as the year countdown:
-  // the next milestone large, the ones after it as a chip row, and the year
-  // itself on its own line below a rule.
-
-  const upcoming = (config.milestones ?? [])
-    .filter((m) => utc(m.date) >= today)
-    .sort((a, b) => utc(a.date) - utc(b.date))
+  // The year count leads, then the full milestone list in calendar order.
 
   const daysTo = (m) => Math.round((utc(m.date) - today) / DAY)
-  let y = y0 + gridH + 86
+  let y = y0 + gridH + 74
 
-  if (upcoming.length) {
-    const next = upcoming[0]
-    const n = daysTo(next)
-    const big = n === 0 ? 'TODAY' : String(n)
-    const art = next.emoji ? sprites[next.emoji] : null
-
-    let tx = left
-    if (art) {
-      out.push(spriteTag(art, left, y - 54, 58))
-      tx = left + 74
-    }
-    out.push(
-      `<text x="${tx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="76" letter-spacing="-2" fill="${THEME.past}">${big}</text>`
-    )
-    if (n !== 0) {
-      out.push(
-        `<text x="${(tx + big.length * 46 + 14).toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="26" letter-spacing="2" fill="${THEME.dim}">DAYS</text>`
-      )
-    }
-    const lbl = publicLabel(next, redactAll)
-    if (lbl) {
-      out.push(
-        `<text x="${tx.toFixed(1)}" y="${y + 38}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${THEME.today}">${esc(lbl.toUpperCase())}</text>`
-      )
-    }
-    y += lbl ? 86 : 62
-
-    // Chip row: each further milestone keeps its own marker and count, so they
-    // stay distinguishable from one another at a glance.
-    const rest = upcoming.slice(1, 1 + footer.upcoming)
-    if (rest.length) {
-      let cx = left
-      for (const m of rest) {
-        const chipArt = m.emoji ? sprites[m.emoji] : null
-        if (chipArt) {
-          out.push(spriteTag(chipArt, cx, y - 26, 32, 0.85))
-          cx += 42
-        } else {
-          out.push(
-            `<circle cx="${(cx + 13).toFixed(1)}" cy="${(y - 10).toFixed(1)}" r="9" fill="none" stroke="${m.color ?? THEME.dim}" stroke-width="3"/>`
-          )
-          cx += 42
-        }
-        const txt = String(daysTo(m))
-        out.push(
-          `<text x="${cx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="30" letter-spacing="0" fill="${THEME.label}">${txt}</text>`
-        )
-        cx += txt.length * 18 + 46
-      }
-      y += 54
-    }
-  }
-
+  // The year countdown sits directly under the grid and carries the most
+  // weight, so a milestone's number can never be mistaken for it.
   if (footer.showYear) {
     const yearStart = utc(`${year}-01-01`)
     const yearEnd = utc(`${year}-12-31`)
     const pct = Math.round(((today - yearStart) / (yearEnd - yearStart)) * 100)
     const daysLeft = Math.round((yearEnd - today) / DAY)
+    const big = String(daysLeft)
 
-    out.push(`<rect x="${left.toFixed(1)}" y="${y - 18}" width="${(right - left).toFixed(1)}" height="1" fill="${THEME.rule}"/>`)
     out.push(
-      `<text x="${left.toFixed(1)}" y="${y + 24}" font-family="JetBrains Mono" font-weight="700" font-size="26" letter-spacing="4" fill="${THEME.dim}">${year}</text>`
+      `<text x="${left.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="68" letter-spacing="-2" fill="${THEME.past}">${big}</text>`
+    )
+    let tx = left + big.length * 41 + 16
+    out.push(
+      `<text x="${tx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="28" letter-spacing="3" fill="${THEME.past}">DAYS LEFT</text>`
     )
     out.push(
-      `<text x="${right.toFixed(1)}" y="${y + 24}" font-family="JetBrains Mono" font-weight="500" font-size="26" letter-spacing="2" fill="${THEME.label}" text-anchor="end">${daysLeft} DAYS LEFT · ${pct}%</text>`
+      `<text x="${tx.toFixed(1)}" y="${(y + 34).toFixed(1)}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${THEME.dim}">IN ${year} · ${pct}%</text>`
     )
+    y += footer.gap
+  }
+
+  // Every milestone, in calendar order rather than by proximity, so the list
+  // reads as a year at a glance. Past dates count backwards.
+  const all = (config.milestones ?? [])
+    .slice()
+    .filter((m) => m.date?.startsWith(String(year)))
+    .sort((a, b) => utc(a.date) - utc(b.date))
+
+  const ROW = 46
+  const room = Math.max(0, Math.floor((layout.height - footer.safeBottom - y) / ROW))
+  const shown = all.slice(0, Math.min(room, footer.maxMilestones))
+
+  for (const m of shown) {
+    const n = daysTo(m)
+    const past = n < 0
+    const art = spriteFor(sprites, m.emoji)
+    const tone = past ? THEME.dim : THEME.label
+
+    if (art) out.push(spriteTag(art, left, y - 25, 32, past ? 0.4 : 0.95))
+    else {
+      out.push(
+        `<circle cx="${(left + 16).toFixed(1)}" cy="${(y - 9).toFixed(1)}" r="8" fill="none" stroke="${m.color ?? tone}" stroke-width="3" opacity="${past ? 0.5 : 1}"/>`
+      )
+    }
+
+    // Right-align the counts so the column reads as a column.
+    const count = n === 0 ? 'TODAY' : String(n)
+    out.push(
+      `<text x="${(left + 186).toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="${n === 0 ? 700 : 500}" font-size="28" letter-spacing="0" fill="${n === 0 ? THEME.today : tone}" text-anchor="end">${count}</text>`
+    )
+
+    const lbl = publicLabel(m, redactAll)
+    if (lbl) {
+      out.push(
+        `<text x="${(left + 212).toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${tone}" opacity="${past ? 0.75 : 1}">${esc(lbl.toUpperCase())}</text>`
+      )
+    }
+    y += ROW
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${out.join('')}</svg>`

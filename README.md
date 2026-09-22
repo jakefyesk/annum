@@ -86,7 +86,8 @@ git config core.hooksPath .githooks
 {
   "years": [2026, 2027],
   "redactLabels": false,
-  "layout": { "top": 1180, "shape": "circle" },
+  "layout": { "top": 1180, "shape": "circle", "markerScale": 1.2 },
+  "footer": { "showYear": true, "maxMilestones": 12 },
   "milestones": [
     { "date": "2026-11-01", "label": "Marathon", "emoji": "🏃" },
     { "date": "2026-07-04", "private": true, "publicLabel": "Countdown" }
@@ -99,7 +100,14 @@ git config core.hooksPath .githooks
 
 `layout.top` is the vertical offset of the grid in pixels. The default of 1180
 clears the widget stack on an iPhone 14 Pro Max; shift it if your lock screen is
-laid out differently.
+laid out differently. `markerScale` sizes milestone markers relative to the dot
+pitch.
+
+Below the grid the year countdown comes first and carries the most weight, so a
+milestone number can never be misread as days left in the year. Beneath it every
+milestone is listed in calendar order — not by proximity — with past dates
+counting backwards (`-93`). The list trims itself to whatever fits above
+`footer.safeBottom`, which keeps it clear of the lock screen controls.
 
 Emoji are vendored as Fluent Emoji 3D PNGs in `emoji/`, named by codepoint, because CI has
 no colour emoji font. Add one with `node scripts/add-emoji.mjs 🎿`. A
