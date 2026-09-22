@@ -109,9 +109,14 @@ milestone is listed in calendar order — not by proximity — with past dates
 counting backwards (`-93`). The list trims itself to whatever fits above
 `footer.safeBottom`, which keeps it clear of the lock screen controls.
 
-Emoji are vendored as Fluent Emoji 3D PNGs in `emoji/`, named by codepoint, because CI has
-no colour emoji font. Add one with `node scripts/add-emoji.mjs 🎿`. A
-milestone whose emoji has no sprite falls back to an accent ring.
+Emoji are Fluent Emoji 3D PNGs, because CI has no colour emoji font. Any of the
+~1,600 emoji in `emoji/fluent-index.json` just works: if your config references
+one that isn't vendored in `emoji/`, the build fetches it. An emoji that isn't in
+Fluent at all fails the build rather than quietly publishing a blank marker.
+
+Vendoring is only an optimisation — `node scripts/add-emoji.mjs 🗽` commits a
+sprite so the build doesn't fetch it each time. Re-run `build-emoji-index.mjs`
+if Fluent adds emoji newer than the committed index.
 
 ## Development
 

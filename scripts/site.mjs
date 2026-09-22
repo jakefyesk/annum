@@ -11,10 +11,7 @@ const DIST = join(ROOT, 'dist')
 mkdirSync(DIST, { recursive: true })
 cpSync(join(ROOT, 'site'), DIST, { recursive: true })
 cpSync(join(ROOT, 'src', 'calendar.mjs'), join(DIST, 'calendar.mjs'))
-// fluent-index.json is a dev-time lookup for add-emoji.mjs; it has no business
-// in the published payload.
-cpSync(join(ROOT, 'emoji'), join(DIST, 'emoji'), {
-  recursive: true,
-  filter: (src) => !src.endsWith('fluent-index.json'),
-})
+// The index ships too: it's a public emoji->path map with nothing personal in
+// it, and the preview needs it to resolve sprites that aren't vendored.
+cpSync(join(ROOT, 'emoji'), join(DIST, 'emoji'), { recursive: true })
 console.log('site assembled into dist/')

@@ -37,6 +37,48 @@ for (const f of readdirSync(join(ROOT, 'emoji'))) {
   }
 }
 
+// Config lives in a secret, so an emoji can be added there with no matching
+// push. Anything referenced but not vendored is fetched here rather than
+// silently degrading to a fallback ring.
+const SKIN = /[\u{1F3FB}-\u{1F3FF}]/gu
+const bare = (ch) => ch.replace(SKIN, '').replace(/️/g, '')
+const known = (ch) => sprites[ch] ?? sprites[bare(ch)] ?? sprites[bare(ch) + '️']
+
+const wanted = [...new Set((config.milestones ?? []).map((m) => m.emoji).filter(Boolean))]
+const missing = wanted.filter((ch) => !known(ch))
+
+if (missing.length) {
+  const index = JSON.parse(readFileSync(join(ROOT, 'emoji', 'fluent-index.json'), 'utf8'))
+  const CDN = 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main'
+  const unresolved = []
+
+  await Promise.all(
+    missing.map(async (ch) => {
+      const path = index[ch] ?? index[bare(ch)] ?? index[bare(ch) + '️']
+      if (!path) {
+        unresolved.push(`${ch} is not in Fluent`)
+        return
+      }
+      const res = await fetch(`${CDN}/${path.split('/').map(encodeURIComponent).join('/')}`)
+      if (!res.ok) {
+        unresolved.push(`${ch} — ${path} returned ${res.status}`)
+        return
+      }
+      sprites[bare(ch)] =
+        'data:image/png;base64,' + Buffer.from(await res.arrayBuffer()).toString('base64')
+      console.log(`fetched missing sprite ${ch}`)
+    })
+  )
+
+  // Better to fail than to publish a year of wallpapers with blank markers.
+  if (unresolved.length) {
+    console.error('\ncould not resolve every milestone emoji:\n')
+    for (const u of unresolved) console.error(`  ✗ ${u}`)
+    console.error('\nPick a different emoji, or vendor one into emoji/ by hand.\n')
+    process.exit(1)
+  }
+}
+
 // An unguessable path segment keeps the wallpapers off the guessable Pages URL.
 // Empty slug = published at /w/ directly.
 const SLUG = (process.env.ANNUM_SLUG ?? config.slug ?? '').replace(/[^a-zA-Z0-9_-]/g, '')

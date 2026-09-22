@@ -177,15 +177,32 @@ const state = {
 }
 
 const sprites = {}
+const CDN = 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main'
+const SKIN = /[\u{1F3FB}-\u{1F3FF}]/gu
+const bare = (ch) => ch.replace(SKIN, '').replace(/\uFE0F/g, '')
+
+// Only fetched if you reach for an emoji that isn't vendored, and only to map
+// it to a URL — same resolution the build does, so preview matches output.
+let fluentIndex = null
+const getIndex = async () => (fluentIndex ??= await fetch('./emoji/fluent-index.json').then((r) => r.json()))
+
 async function loadSprite(ch) {
   if (!ch || sprites[ch] !== undefined) return
   sprites[ch] = null
-  const cp = [...ch].map((c) => c.codePointAt(0).toString(16)).filter((h) => h !== 'fe0f').join('-')
+  const cp = [...bare(ch)].map((c) => c.codePointAt(0).toString(16)).join('-')
   try {
     // The renderer takes a URL for raster sprites, so no base64 round-trip here.
-    const res = await fetch(`./emoji/${cp}.png`, { method: 'HEAD' })
-    if (res.ok) { sprites[ch] = `./emoji/${cp}.png`; draw() }
-  } catch { /* sprite missing: renderer falls back to a ring */ }
+    if ((await fetch(`./emoji/${cp}.png`, { method: 'HEAD' })).ok) {
+      sprites[ch] = `./emoji/${cp}.png`
+      return draw()
+    }
+    const idx = await getIndex()
+    const path = idx[ch] ?? idx[bare(ch)] ?? idx[bare(ch) + '\uFE0F']
+    if (path) {
+      sprites[ch] = `${CDN}/${path.split('/').map(encodeURIComponent).join('/')}`
+      draw()
+    }
+  } catch { /* unresolved: renderer falls back to a ring */ }
 }
 
 function draw() {

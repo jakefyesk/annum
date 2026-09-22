@@ -8,7 +8,13 @@ import { fileURLToPath } from 'node:url'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = join(ROOT, 'dist')
 
-const ALLOWED = [/\.png$/, /^index\.html$/, /^calendar\.mjs$/, /^emoji\/[0-9a-f-]+\.(png|svg)$/]
+const ALLOWED = [
+  /\.png$/,
+  /^index\.html$/,
+  /^calendar\.mjs$/,
+  /^emoji\/[0-9a-f-]+\.(png|svg)$/,
+  /^emoji\/fluent-index\.json$/,
+]
 
 function* walk(dir) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
