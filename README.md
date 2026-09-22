@@ -33,22 +33,36 @@ year rollover needs no attention either.
 
 ## Privacy
 
-The repo is public and the wallpapers are served unauthenticated. Both of those
-leak, and they leak differently:
+Worth being precise about, because the obvious framing is wrong. **Almost
+everything in the config is already visible in the wallpaper** — dates, emoji,
+visible labels, which weeks are tinted. The PNG is served unauthenticated. The
+only things the config holds that the image doesn't are the true labels of
+`private: true` milestones and range labels, which are never drawn.
 
-- **The config** would expose exact dates and labels. It never enters the repo.
-  Your real settings live in the `ANNUM_CONFIG` repository secret as base64 JSON;
-  `config.json` is gitignored, and only `config.example.json` is tracked.
-- **The image itself** is the subtler one. The next milestone's label is drawn as
-  literal text, and range dots reveal which weeks you're away — no label needed.
-  Marking a milestone `"private": true` keeps its marker and countdown but drops
-  the words. `"redactLabels": true` does that globally.
-- **The URL** is the only thing protecting the image. Set `ANNUM_SLUG` to a random
-  string and the wallpapers publish under an unguessable path. This is
-  share-link security, not authentication — anyone holding the URL can read it,
-  so treat it like a "anyone with the link" document.
+So the thing worth protecting isn't the *content*, it's **discoverability**:
 
-Three checks enforce this rather than relying on care:
+- A committed `config.json` lands in public, listed, search-indexed git history,
+  permanently, and can't be retracted.
+- The wallpaper lives at an unlisted URL that nobody can guess.
+
+The slug is doing the real work. Which is why the two settings are stored
+differently:
+
+| | Store | Why |
+|---|---|---|
+| `ANNUM_SLUG` | secret | The only thing keeping wallpapers off a guessable URL, so it must stay masked in logs |
+| `ANNUM_CONFIG` | variable | Readable, so events can be edited conversationally. Its contents are largely inferable from the image anyway |
+
+Variables are **not** masked in Actions logs the way secrets are, and this repo's
+logs are public. That is why the config is base64-encoded: not as encryption —
+it isn't any — but so a stray trace prints a blob rather than your calendar.
+Never echo `ANNUM_CONFIG`, and never enable shell tracing in the build job.
+
+For label-level control, `"private": true` on a milestone keeps its marker and
+countdown but drops the words from the image; `"redactLabels": true` does that
+globally.
+
+Three checks keep the config out of git history, where no slug would help:
 
 | Check | Where | Catches |
 |---|---|---|
@@ -62,13 +76,30 @@ Enable the hook once per clone:
 git config core.hooksPath .githooks
 ```
 
+## Editing events
+
+```bash
+node scripts/events.mjs list
+node scripts/events.mjs add 2026-11-01 "NYC Marathon" 🗽
+node scripts/events.mjs add 2026-07-04 "Something" --private
+node scripts/events.mjs rm "NYC Marathon"
+node scripts/events.mjs range 2026-12-20 2026-12-31
+node scripts/events.mjs deploy
+```
+
+Each command reads the current variable, edits it, writes it back, and mirrors
+the result into a gitignored local `config.json`. `pull` and `push` move between
+the two by hand. Because the variable reads back, this is all editable in
+conversation — "add the marathon on 1 November" is enough.
+
 ## Setup
 
 1. **Build your config.** Open the Pages site, add milestones and ranges, and
    watch the preview. The page is static and sends nothing anywhere.
 2. **Store it.** Copy the base64 blob into `Settings → Secrets and variables →
-   Actions → New repository secret`, named `ANNUM_CONFIG`. Add `ANNUM_SLUG` with a
-   random string if you want an unguessable URL.
+   Actions → Variables`, named `ANNUM_CONFIG` — a variable, not a secret, so it
+   can be read back and edited later. Then add `ANNUM_SLUG` as a *secret*
+   (`openssl rand -hex 16`) to move the wallpapers off a guessable URL.
 3. **Deploy.** `Settings → Pages → Source: GitHub Actions`, then run the workflow.
 4. **Automate the phone.** Shortcuts → Automation → Time of Day, 6:00 AM, Daily,
    Run Immediately → Create New Shortcut:

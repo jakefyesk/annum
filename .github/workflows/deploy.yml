@@ -35,9 +35,17 @@ jobs:
 
       - name: Build
         env:
-          # Base64 so no raw date or label can surface in a log line even if
-          # something decides to print its environment.
-          ANNUM_CONFIG: ${{ secrets.ANNUM_CONFIG }}
+          # A variable, not a secret, so it can be read back and edited
+          # conversationally. Its contents are largely inferable from the
+          # published wallpaper anyway — see README → Privacy.
+          #
+          # But variables are NOT masked in logs the way secrets are, and this
+          # repo's logs are public, so the base64 is load-bearing here: it is
+          # what stands between a stray trace and a readable calendar. Never
+          # echo it, and never turn on shell tracing in this job.
+          ANNUM_CONFIG: ${{ vars.ANNUM_CONFIG }}
+          # The slug stays a secret. It is the only thing keeping the
+          # wallpapers off a guessable URL, so it must be masked.
           ANNUM_SLUG: ${{ secrets.ANNUM_SLUG }}
         run: npm run build
 
