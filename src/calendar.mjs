@@ -180,12 +180,14 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
     out.push(
       `<text x="${left.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="68" letter-spacing="-2" fill="${THEME.past}">${big}</text>`
     )
-    let tx = left + big.length * 41 + 16
+    const tx = left + big.length * 41 + 16
     out.push(
       `<text x="${tx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="28" letter-spacing="3" fill="${THEME.past}">DAYS LEFT</text>`
     )
+    // Same baseline, opposite edge: the year and percentage read as context for
+    // the count rather than as a second line of it.
     out.push(
-      `<text x="${tx.toFixed(1)}" y="${(y + 34).toFixed(1)}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${THEME.dim}">IN ${year} · ${pct}%</text>`
+      `<text x="${right.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${THEME.dim}" text-anchor="end">IN ${year} · ${pct}%</text>`
     )
     y += footer.gap
   }
@@ -201,29 +203,26 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
   const room = Math.max(0, Math.floor((layout.height - footer.safeBottom - y) / ROW))
   const shown = all.slice(0, Math.min(room, footer.maxMilestones))
 
+  // No markers here — the emoji live in the grid, where they mark a position.
+  // Repeating them down the list just adds colour the list doesn't need.
+  const COUNT_RIGHT = left + 96
+  const LABEL_LEFT = left + 124
+
   for (const m of shown) {
     const n = daysTo(m)
     const past = n < 0
-    const art = spriteFor(sprites, m.emoji)
     const tone = past ? THEME.dim : THEME.label
-
-    if (art) out.push(spriteTag(art, left, y - 25, 32, past ? 0.4 : 0.95))
-    else {
-      out.push(
-        `<circle cx="${(left + 16).toFixed(1)}" cy="${(y - 9).toFixed(1)}" r="8" fill="none" stroke="${m.color ?? tone}" stroke-width="3" opacity="${past ? 0.5 : 1}"/>`
-      )
-    }
 
     // Right-align the counts so the column reads as a column.
     const count = n === 0 ? 'TODAY' : String(n)
     out.push(
-      `<text x="${(left + 186).toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="${n === 0 ? 700 : 500}" font-size="28" letter-spacing="0" fill="${n === 0 ? THEME.today : tone}" text-anchor="end">${count}</text>`
+      `<text x="${COUNT_RIGHT.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="${n === 0 ? 700 : 500}" font-size="28" letter-spacing="0" fill="${n === 0 ? THEME.today : tone}" text-anchor="end">${count}</text>`
     )
 
     const lbl = publicLabel(m, redactAll)
     if (lbl) {
       out.push(
-        `<text x="${(left + 212).toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${tone}" opacity="${past ? 0.75 : 1}">${esc(lbl.toUpperCase())}</text>`
+        `<text x="${LABEL_LEFT.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${tone}" opacity="${past ? 0.75 : 1}">${esc(lbl.toUpperCase())}</text>`
       )
     }
     y += ROW
