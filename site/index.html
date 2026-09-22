@@ -159,7 +159,7 @@
 </main>
 
 <footer>
-  Emoji artwork from <a href="https://github.com/jdecked/twemoji">Twemoji</a>, CC-BY 4.0.
+  Emoji artwork from <a href="https://github.com/microsoft/fluentui-emoji">Fluent Emoji</a> by Microsoft, MIT.
 </footer>
 
 <script type="module">
@@ -169,7 +169,10 @@ const $ = (s) => document.querySelector(s)
 const todayISO = new Date().toISOString().slice(0, 10)
 
 const state = {
-  milestones: [{ date: `${todayISO.slice(0,4)}-12-25`, label: 'Christmas', emoji: '🎄', private: false }],
+  milestones: [
+    { date: `${todayISO.slice(0,4)}-10-31`, label: 'Halloween', emoji: '🎃', private: false },
+    { date: `${todayISO.slice(0,4)}-12-25`, label: 'Christmas', emoji: '🎄', private: false },
+  ],
   ranges: [],
 }
 
@@ -179,8 +182,9 @@ async function loadSprite(ch) {
   sprites[ch] = null
   const cp = [...ch].map((c) => c.codePointAt(0).toString(16)).filter((h) => h !== 'fe0f').join('-')
   try {
-    const res = await fetch(`./emoji/${cp}.svg`)
-    if (res.ok) { sprites[ch] = await res.text(); draw() }
+    // The renderer takes a URL for raster sprites, so no base64 round-trip here.
+    const res = await fetch(`./emoji/${cp}.png`, { method: 'HEAD' })
+    if (res.ok) { sprites[ch] = `./emoji/${cp}.png`; draw() }
   } catch { /* sprite missing: renderer falls back to a ring */ }
 }
 

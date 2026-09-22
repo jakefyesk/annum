@@ -101,8 +101,8 @@ git config core.hooksPath .githooks
 clears the widget stack on an iPhone 14 Pro Max; shift it if your lock screen is
 laid out differently.
 
-Emoji are vendored as Twemoji SVGs in `emoji/`, named by codepoint, because CI has
-no colour emoji font. To add one, drop `<codepoint>.svg` in that directory. A
+Emoji are vendored as Fluent Emoji 3D PNGs in `emoji/`, named by codepoint, because CI has
+no colour emoji font. Add one with `node scripts/add-emoji.mjs 🎿`. A
 milestone whose emoji has no sprite falls back to an accent ring.
 
 ## Development
@@ -126,4 +126,4 @@ versus 50 ms with `fontDirs`. Use `fontDirs` anywhere there's a filesystem.
 Inspired by [thelifecalendar.com](https://thelifecalendar.com) by
 [@luismbat](https://x.com/luismbat) and [@joao_batalha](https://x.com/joao_batalha),
 rebuilt from scratch with a different layout and feature set. Emoji artwork from
-[Twemoji](https://github.com/jdecked/twemoji), CC-BY 4.0.
+[Fluent Emoji](https://github.com/microsoft/fluentui-emoji) by Microsoft, MIT licensed.

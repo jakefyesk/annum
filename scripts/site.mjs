@@ -11,5 +11,10 @@ const DIST = join(ROOT, 'dist')
 mkdirSync(DIST, { recursive: true })
 cpSync(join(ROOT, 'site'), DIST, { recursive: true })
 cpSync(join(ROOT, 'src', 'calendar.mjs'), join(DIST, 'calendar.mjs'))
-cpSync(join(ROOT, 'emoji'), join(DIST, 'emoji'), { recursive: true })
+// fluent-index.json is a dev-time lookup for add-emoji.mjs; it has no business
+// in the published payload.
+cpSync(join(ROOT, 'emoji'), join(DIST, 'emoji'), {
+  recursive: true,
+  filter: (src) => !src.endsWith('fluent-index.json'),
+})
 console.log('site assembled into dist/')

@@ -8,6 +8,7 @@ export const THEME = {
   future: '#333333',
   dim: '#6E6E6E',
   label: '#8A8A8A',
+  rule: '#1E1E1E',
   range: '#3D7EFF',
 }
 
@@ -25,7 +26,13 @@ export const DEFAULT_LAYOUT = {
   marginX: 96,
   top: 1180,
   dotRatio: 0.62,
+  markerScale: 1.2,
   shape: 'circle',
+}
+
+export const DEFAULT_FOOTER = {
+  upcoming: 3, // how many further milestones get their own countdown
+  showYear: true,
 }
 
 function buildYear(year, today) {
@@ -51,8 +58,24 @@ function publicLabel(milestone, redactAll) {
   return milestone.label ?? null
 }
 
+// Sprites arrive either as SVG markup (inlined) or as a URL / data URI. The
+// browser passes a relative path; CI passes a data URI, because resvg has no
+// notion of a base directory.
+function spriteTag(art, x, y, size, opacity = 1) {
+  if (art.trimStart().startsWith('<')) {
+    const inner = art
+      .replace(/<\?xml[^>]*\?>/, '')
+      .replace(/^\s*<svg[^>]*>/, '')
+      .replace(/<\/svg>\s*$/, '')
+    const vb = /viewBox="([^"]+)"/.exec(art)?.[1] ?? '0 0 36 36'
+    return `<svg x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" viewBox="${vb}" opacity="${opacity}">${inner}</svg>`
+  }
+  return `<image x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" href="${esc(art)}" opacity="${opacity}"/>`
+}
+
 export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = {} }) {
   const layout = { ...DEFAULT_LAYOUT, ...over }
+  const footer = { ...DEFAULT_FOOTER, ...(config.footer ?? {}) }
   const { width: W, height: H } = layout
   const year = Number(todayStr.slice(0, 4))
   const today = utc(todayStr)
@@ -61,7 +84,6 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
   const days = buildYear(year, today)
   const byDate = new Map(days.map((d) => [d.date, d]))
 
-  // Ranges first, point milestones on top.
   for (const r of config.ranges ?? []) {
     for (let t = utc(r.start); t <= utc(r.end); t += DAY) {
       const d = byDate.get(iso(t))
@@ -80,6 +102,8 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
   const x0 = (W - gridW) / 2 + pitch / 2
   const y0 = layout.top
   const gridH = 7 * pitch
+  const left = x0 - pitch / 2
+  const right = x0 + gridW - pitch / 2
 
   const out = [`<rect width="${W}" height="${H}" fill="${THEME.bg}"/>`]
 
@@ -117,56 +141,94 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
 
   for (const { d, cx, cy } of markers) {
     const m = d.milestone
-    const size = pitch * 1.9
-    const sprite = m.emoji ? sprites[m.emoji] : null
-    if (sprite) {
-      const inner = sprite
-        .replace(/<\?xml[^>]*\?>/, '')
-        .replace(/^<svg[^>]*>/, '')
-        .replace(/<\/svg>\s*$/, '')
-      const vb = /viewBox="([^"]+)"/.exec(sprite)?.[1] ?? '0 0 36 36'
-      out.push(
-        `<svg x="${(cx - size / 2).toFixed(1)}" y="${(cy - size / 2).toFixed(1)}" width="${size.toFixed(1)}" height="${size.toFixed(1)}" viewBox="${vb}" opacity="${d.state === 'past' ? 0.45 : 1}">${inner}</svg>`
-      )
-    } else {
-      out.push(
-        `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(r * 1.7).toFixed(1)}" fill="none" stroke="${m.color ?? THEME.today}" stroke-width="${(r * 0.7).toFixed(1)}"/>`
-      )
-    }
+    const size = pitch * layout.markerScale
+    const art = m.emoji ? sprites[m.emoji] : null
+    out.push(
+      art
+        ? spriteTag(art, cx - size / 2, cy - size / 2, size, d.state === 'past' ? 0.45 : 1)
+        : `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(r * 1.7).toFixed(1)}" fill="none" stroke="${m.color ?? THEME.today}" stroke-width="${(r * 0.7).toFixed(1)}"/>`
+    )
   }
+
+  // ---- Footer -------------------------------------------------------------
+  // Three tiers, so a milestone countdown never reads as the year countdown:
+  // the next milestone large, the ones after it as a chip row, and the year
+  // itself on its own line below a rule.
 
   const upcoming = (config.milestones ?? [])
     .filter((m) => utc(m.date) >= today)
-    .sort((a, b) => utc(a.date) - utc(b.date))[0]
+    .sort((a, b) => utc(a.date) - utc(b.date))
 
-  const yearStart = utc(`${year}-01-01`)
-  const yearEnd = utc(`${year}-12-31`)
-  const pct = Math.round(((today - yearStart) / (yearEnd - yearStart)) * 100)
-  const left = Math.round((yearEnd - today) / DAY)
+  const daysTo = (m) => Math.round((utc(m.date) - today) / DAY)
+  let y = y0 + gridH + 86
 
-  let fy = y0 + gridH + 78
-  if (upcoming) {
-    const n = Math.round((utc(upcoming.date) - today) / DAY)
+  if (upcoming.length) {
+    const next = upcoming[0]
+    const n = daysTo(next)
     const big = n === 0 ? 'TODAY' : String(n)
+    const art = next.emoji ? sprites[next.emoji] : null
+
+    let tx = left
+    if (art) {
+      out.push(spriteTag(art, left, y - 54, 58))
+      tx = left + 74
+    }
     out.push(
-      `<text x="${x0 - pitch / 2}" y="${fy}" font-family="JetBrains Mono" font-weight="700" font-size="76" letter-spacing="-2" fill="${THEME.past}">${big}</text>`
+      `<text x="${tx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="76" letter-spacing="-2" fill="${THEME.past}">${big}</text>`
     )
     if (n !== 0) {
       out.push(
-        `<text x="${x0 - pitch / 2 + big.length * 46 + 14}" y="${fy}" font-family="JetBrains Mono" font-weight="500" font-size="26" letter-spacing="2" fill="${THEME.dim}">DAYS</text>`
+        `<text x="${(tx + big.length * 46 + 14).toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="26" letter-spacing="2" fill="${THEME.dim}">DAYS</text>`
       )
     }
-    const lbl = publicLabel(upcoming, redactAll)
+    const lbl = publicLabel(next, redactAll)
     if (lbl) {
       out.push(
-        `<text x="${x0 - pitch / 2}" y="${fy + 38}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${THEME.today}">${esc(lbl.toUpperCase())}</text>`
+        `<text x="${tx.toFixed(1)}" y="${y + 38}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${THEME.today}">${esc(lbl.toUpperCase())}</text>`
       )
     }
-    fy += 38
+    y += lbl ? 86 : 62
+
+    // Chip row: each further milestone keeps its own marker and count, so they
+    // stay distinguishable from one another at a glance.
+    const rest = upcoming.slice(1, 1 + footer.upcoming)
+    if (rest.length) {
+      let cx = left
+      for (const m of rest) {
+        const chipArt = m.emoji ? sprites[m.emoji] : null
+        if (chipArt) {
+          out.push(spriteTag(chipArt, cx, y - 26, 32, 0.85))
+          cx += 42
+        } else {
+          out.push(
+            `<circle cx="${(cx + 13).toFixed(1)}" cy="${(y - 10).toFixed(1)}" r="9" fill="none" stroke="${m.color ?? THEME.dim}" stroke-width="3"/>`
+          )
+          cx += 42
+        }
+        const txt = String(daysTo(m))
+        out.push(
+          `<text x="${cx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="30" letter-spacing="0" fill="${THEME.label}">${txt}</text>`
+        )
+        cx += txt.length * 18 + 46
+      }
+      y += 54
+    }
   }
-  out.push(
-    `<text x="${x0 + gridW - pitch / 2}" y="${fy}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${THEME.label}" text-anchor="end">${left}D LEFT · ${pct}%</text>`
-  )
+
+  if (footer.showYear) {
+    const yearStart = utc(`${year}-01-01`)
+    const yearEnd = utc(`${year}-12-31`)
+    const pct = Math.round(((today - yearStart) / (yearEnd - yearStart)) * 100)
+    const daysLeft = Math.round((yearEnd - today) / DAY)
+
+    out.push(`<rect x="${left.toFixed(1)}" y="${y - 18}" width="${(right - left).toFixed(1)}" height="1" fill="${THEME.rule}"/>`)
+    out.push(
+      `<text x="${left.toFixed(1)}" y="${y + 24}" font-family="JetBrains Mono" font-weight="700" font-size="26" letter-spacing="4" fill="${THEME.dim}">${year}</text>`
+    )
+    out.push(
+      `<text x="${right.toFixed(1)}" y="${y + 24}" font-family="JetBrains Mono" font-weight="500" font-size="26" letter-spacing="2" fill="${THEME.label}" text-anchor="end">${daysLeft} DAYS LEFT · ${pct}%</text>`
+    )
+  }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${out.join('')}</svg>`
 }

@@ -24,12 +24,17 @@ function loadConfig() {
 
 const config = loadConfig()
 
-// Twemoji sprites, vendored so CI never depends on an emoji font being present.
+// resvg has no base directory for relative hrefs, so PNG sprites are inlined
+// as data URIs. The browser preview points at the files instead.
 const sprites = {}
 const cpToChar = (name) =>
-  String.fromCodePoint(...name.replace(/\.svg$/, '').split('-').map((h) => parseInt(h, 16)))
-for (const f of readdirSync(join(ROOT, 'emoji')).filter((f) => f.endsWith('.svg'))) {
-  sprites[cpToChar(f)] = readFileSync(join(ROOT, 'emoji', f), 'utf8')
+  String.fromCodePoint(...name.replace(/\.(png|svg)$/, '').split('-').map((h) => parseInt(h, 16)))
+for (const f of readdirSync(join(ROOT, 'emoji'))) {
+  if (f.endsWith('.svg')) {
+    sprites[cpToChar(f)] = readFileSync(join(ROOT, 'emoji', f), 'utf8')
+  } else if (f.endsWith('.png')) {
+    sprites[cpToChar(f)] = 'data:image/png;base64,' + readFileSync(join(ROOT, 'emoji', f)).toString('base64')
+  }
 }
 
 // An unguessable path segment keeps the wallpapers off the guessable Pages URL.
