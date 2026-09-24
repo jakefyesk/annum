@@ -32,7 +32,7 @@ and no 60-day inactivity timer to work around. It also means the date is always
 correct — the phone knows its own timezone, including DST and travel, which a
 server rendering on a fixed schedule does not.
 
-Two years are rendered at a time (~60 MB for all three screens, against a 1 GB
+Two years are rendered at a time (~45 MB for all three screens, against a 1 GB
 Pages limit), so the year rollover needs no attention either.
 
 ## Privacy
@@ -183,12 +183,20 @@ milestone list, split into columns, above the Dock. Set `"desktop": false` or
 `"ultrawide": false` to skip rendering one.
 
 Both desktops centre themselves the way a picture framer cuts a mat. With
-`"top": "auto"`, margins at the top and sides are about equal and the bottom one
-is `balance` (1.25) times the top, so the block's centre sits just above the
-middle, where it reads as centred rather than sagging. It never rises above
-`safeTop`, the lock screen clock's limit. A number instead puts the grid's top
-row at that pixel. `corners` draws faint corner marks one dot-pitch outside the
-block, that many pixels wide; `0` turns them off.
+`"top": "auto"`, the space below the block is `balance` (1.25) times the space
+above it, so its centre sits just above the middle, where it reads as centred
+rather than sagging. It never starts higher than `safeTop`, the lock screen
+clock's limit, and never so low that the list loses a row. On the MacBook the
+width is chosen so that a full list comes out with top and side margins about
+equal, as a mat's are; the ultrawide is too short for that, so a full list
+there sits at `safeTop`. A number instead puts the grid's top row at that
+pixel. `corners` draws faint corner marks one dot-pitch outside the block, that
+many pixels wide; `0` turns them off.
+
+A config made on the site or from the example before centring arrived pins
+`desktop.layout.top` to 620 (and `ultrawide.layout.top` to 333), which turns
+it off. `node scripts/events.mjs pull`, delete those keys from `config.json`,
+then `push`.
 
 Below the grid the year countdown comes first and carries the most weight, so a
 milestone number can never be misread as days left in the year. Beneath it every
