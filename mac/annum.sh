@@ -21,9 +21,10 @@ LOG="$HOME/Library/Logs/annum.log"
 # 2.2:1 counts as ultrawide. A screen already showing the right file is left
 # alone. Unplugging a display can hand its picture to the one that's left, and
 # comparing first means a run a minute catches that without resetting every
-# screen each time. It prints "fetch" if an ultrawide screen is waiting on an
-# image that isn't downloaded yet (that screen gets the MacBook one
-# meanwhile), and "changed" if it set anything.
+# screen each time. ULTRAWIDE is empty until that image is downloaded, and an
+# ultrawide screen gets the MacBook one meanwhile. It prints "wide" if an
+# ultrawide screen is connected, so its image is worth checking, and
+# "changed" if it set anything.
 # NSWorkspace rather than System Events: no Apple Events means no automation
 # prompt, which a LaunchAgent has no window to show.
 screens() {
@@ -35,10 +36,10 @@ screens() {
       const has = (p) => $.NSFileManager.defaultManager.fileExistsAtPath(p)
       const norm = (u) => ObjC.unwrap(u.URLByStandardizingPath.path) || ""
       const screens = $.NSScreen.screens
-      let waiting = false, changed = false
+      let connected = false, changed = false
       for (let i = 0; i < screens.count; i++) {
         const s = screens.objectAtIndex(i)
-        if (wide(s) && !has(argv[1])) waiting = true
+        if (wide(s)) connected = true
         const path = wide(s) && has(argv[1]) ? argv[1] : argv[0]
         let shown = ""
         try { shown = norm(ws.desktopImageURLForScreen(s)) } catch (e) {}
@@ -48,49 +49,88 @@ screens() {
         if (!ok) throw new Error("macOS refused the desktop picture")
         changed = true
       }
-      return [waiting ? "fetch" : "", changed ? "changed" : ""].join(" ").trim()
+      return [connected ? "wide" : "", changed ? "changed" : ""].join(" ").trim()
     }' "$@"
 }
 
-# fetch URL FILE: downloads an image unless it's already there. No retries
-# within a run, since the next run is a minute away, but after a failure it
-# waits 15 minutes before trying again and logs only the first, so a missing
-# image can't keep the agent busy or fill the log.
+# current STEM: STEM is a day's picture without the extension, such as
+# .../desktop/2026-09-24. Sets $got to the copy of it on disk and $etag to the
+# ETag that copy came with, both read from STEM.current. Both are empty until
+# there's a copy.
+current() {
+  got= etag=
+  [ -f "$1.current" ] && read -r got etag < "$1.current" || :
+  if [ -f "${1%/*}/$got" ]; then got=${1%/*}/$got; else got= etag=; fi
+}
+
+# fetch URL STEM: brings the copy of URL up to date and leaves its path in
+# $got, which stays empty while there's no copy. Each version gets a name of
+# its own, STEM-<hash>.png, because macOS caches the picture by path and won't
+# redraw one whose path hasn't changed. A redeploy saved over the same file
+# stays stale on screen. Naming by content means a redeploy that didn't
+# change this image keeps the name, so the screen is left alone.
+# The request carries the copy's ETag, so while the image is unchanged each
+# check is one small request that gets a 304 and no body. No retries within
+# a run, since the next run is a minute away, but after a failure it waits 15
+# minutes before trying again and logs only the first, so a missing image
+# can't keep the agent busy or fill the log. Any copy already on hand stays
+# in use meanwhile.
 fetch() {
-  [ -s "$2" ] && return 0
-  [ -n "$(find "$2.failed" -mmin -15 2>/dev/null)" ] && return 1
+  current "$2"
+  # Without an ETag the only check is a full download every minute, so a
+  # server that sends none is fetched once a day instead.
+  [ -n "$got" ] && [ -z "$etag" ] && return 0
+  [ -n "$(find "$2.failed" -mmin -15 2>/dev/null)" ] && return 0
   # -L because Pages redirects github.io to a custom domain when the account
   # has one; without it curl saves the redirect page and exits 0. Anything
   # that isn't a PNG would become the default wallpaper and stay that way.
-  if ! curl -fsSL --proto-redir =https --connect-timeout 20 -o "$2.part" "$1" ||
-    [ "$(dd if="$2.part" bs=1 skip=1 count=3 2>/dev/null)" != PNG ]; then
-    rm -f "$2.part"
-    [ -e "$2.failed" ] || echo "$(date '+%F %T') could not fetch ${2#"$DIR"/}" >&2
+  # --max-time because launchd won't start the next run while this one hangs.
+  # curl leaves out a header with nothing after the colon, so with no copy
+  # the request is unconditional.
+  code=$(curl -fsL --proto-redir =https --connect-timeout 20 --max-time 120 \
+    -H "If-None-Match: $etag" -D "$2.head" -o "$2.part" -w '%{http_code}' "$1") &&
+    rc=0 || rc=$?
+  if [ "$rc" = 0 ] && [ "$code" = 304 ]; then
+    rm -f "$2.part" "$2.head" "$2.failed"
+  elif [ "$rc" = 0 ] && [ "$(dd if="$2.part" bs=1 skip=1 count=3 2>/dev/null)" = PNG ]; then
+    got=$2-$(md5 -q "$2.part" | cut -c 1-8).png
+    # The last response's ETag, not one from a redirect before it.
+    etag=$(awk '{ sub(/\r$/, "") } /^HTTP\// { e = "" }
+      tolower($1) == "etag:" { e = $2 } END { print e }' "$2.head")
+    mv "$2.part" "$got"
+    printf '%s %s\n' "${got##*/}" "$etag" > "$2.current"
+    rm -f "$2.head" "$2.failed"
+    echo "$(date '+%F %T') fetched ${got#"$DIR"/}"
+  else
+    rm -f "$2.part" "$2.head"
+    case $rc in 0) why="not a PNG" ;; *) why="curl exit $rc" ;; esac
+    [ -e "$2.failed" ] || echo "$(date '+%F %T') could not fetch" \
+      "${2#"$DIR"/}.png (HTTP $code, $why)" >&2
     touch "$2.failed"
-    return 1
   fi
-  mv "$2.part" "$2"
-  rm -f "$2.failed"
-  echo "$(date '+%F %T') fetched ${2#"$DIR"/}"
 }
 
 cmd_run() {
   base=${1:?usage: annum.sh run URL}
   today=$(date +%F)
-  # A new filename each day matters: macOS caches the picture by path and
-  # won't redraw one whose path hasn't changed.
-  desk="$DIR/desktop/$today.png"
-  wide="$DIR/ultrawide/$today.png"
   mkdir -p "$DIR/desktop" "$DIR/ultrawide"
-  fetch "$base/$today.png" "$desk" || exit 1
+  fetch "$base/$today.png" "$DIR/desktop/$today"
+  [ -n "$got" ] || exit 1
+  desk=$got
 
-  # The ultrawide render is fetched only once such a screen is connected. If
-  # it can't be — not deployed yet, or "ultrawide": false — that screen keeps
-  # the MacBook picture.
+  # The ultrawide render is checked only while such a screen is connected.
+  # Until there's a copy of it, that screen gets the MacBook picture. There's
+  # none before the first check, none while it isn't deployed, and none with
+  # "ultrawide": false.
+  current "$DIR/ultrawide/$today"
+  wide=$got
   result=$(screens "$desk" "$wide")
-  case $result in *fetch*)
-    fetch "${base%/desktop}/ultrawide/$today.png" "$wide" &&
-      result="$result $(screens "$desk" "$wide")" ;;
+  case $result in *wide*)
+    fetch "${base%/desktop}/ultrawide/$today.png" "$DIR/ultrawide/$today"
+    if [ "$got" != "$wide" ]; then
+      wide=$got
+      result="$result $(screens "$desk" "$wide")"
+    fi ;;
   esac
   # macOS's wallpaper agent has been seen applying a stale cached picture
   # just after a new one is set, and a display that has just been plugged in
@@ -102,8 +142,10 @@ cmd_run() {
 
   # Keep a week. Spaces that weren't in front during a run still point at an
   # older file, and a deleted one turns into the default wallpaper on login.
-  # The trailing * catches a .part or .failed left behind.
-  find "$DIR" -name '????-??-??.png*' -mtime +7 -delete
+  # That includes a version replaced earlier the same day. The trailing *
+  # catches each -<hash>.png version and the .current, .part, .head and
+  # .failed files beside them.
+  find "$DIR" -name '????-??-??*' -mtime +7 -delete
 }
 
 cmd_install() {
