@@ -32,8 +32,8 @@ and no 60-day inactivity timer to work around. It also means the date is always
 correct — the phone knows its own timezone, including DST and travel, which a
 server rendering on a fixed schedule does not.
 
-Two years are rendered at a time (~50 MB for both devices, against a 1 GB Pages
-limit), so the year rollover needs no attention either.
+Two years are rendered at a time (~60 MB for all three screens, against a 1 GB
+Pages limit), so the year rollover needs no attention either.
 
 ## Privacy
 

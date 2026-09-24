@@ -51,10 +51,14 @@ export const DEVICES = {
     layout: { width: 3024, height: 1964, marginX: 256, top: 620, scale: 1.6 },
     footer: { gap: 188, safeBottom: 260, columns: 3 },
   },
-  // 43" 32:10 super-ultrawide (ASUS ROG Strix XG43VQ) at its native 3840x1200.
+  // 43" 32:10 super-ultrawide (ASUS ROG Strix XG43VQ) at its native 3840x1200,
+  // which macOS drives at 1x. The MacBook's proportions, with type a little
+  // larger than a pure angular match because 1x has half the pixels per glyph.
+  // The margins make the dot pitch a whole 32px, so every dot draws alike; the
+  // month labels clear the lock screen clock by the same 263pt as the laptop's.
   ultrawide: {
-    layout: { width: 3840, height: 1200, marginX: 720, top: 300, scale: 1.1 },
-    footer: { gap: 130, safeBottom: 110, columns: 4 },
+    layout: { width: 3840, height: 1200, marginX: 1072, top: 333, scale: 1.1 },
+    footer: { gap: 112, safeBottom: 130, columns: 3 },
   },
 }
 
