@@ -190,12 +190,15 @@ Both desktops centre themselves the way a picture framer cuts a mat. With
 `"top": "auto"`, the space below the block is `balance` (1.25) times the space
 above it, so its centre sits just above the middle, where it reads as centred
 rather than sagging. It never starts higher than `safeTop`, the lock screen
-clock's limit, and never so low that the list loses a row. Both blocks are
-kept small and quiet, dots and type shrinking together down to the smallest
-type that still reads, so the negative space around them does the framing.
-A number instead puts the grid's top row at that pixel. `corners` draws faint
-corner marks one dot-pitch outside the block, that many pixels wide; `0` turns
-them off.
+clock's limit, and never so low that the list loses a row. A number instead
+puts the grid's top row at that pixel. Both blocks are kept small and quiet,
+dots and type shrinking together down to the smallest type that still reads,
+so the negative space around them does the framing. The ultrawide's is sized
+to look like the MacBook's from where each is usually seen — the same visual
+angle, and the same share of the screen's height — rather than to fill as
+much of a screen whose sides are out in peripheral vision. `corners` draws
+faint corner marks one dot-pitch outside the block, that many pixels wide;
+`0` turns them off.
 
 A config made on the site or from the example before centring arrived pins
 `desktop.layout.top` to 620 (and `ultrawide.layout.top` to 333), which turns
