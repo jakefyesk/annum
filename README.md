@@ -136,16 +136,19 @@ conversation — "add the marathon on 1 November" is enough.
    https://<user>.github.io/annum/w/<slug>
    ```
 
-   It checks today's image exists, then installs a LaunchAgent that sets the
-   desktop picture on login and every hour after. A Mac asleep at midnight
-   catches up when it wakes. Each display gets the render of its shape: an
-   ultrawide screen (wider than 2.2:1, like the ASUS XG43VQ) gets the 3840×1200
-   one, and every other screen the MacBook's. A display plugged in between runs
-   picks up its picture at the next one. It sets the picture through NSWorkspace rather than
+   It checks today's image exists, then installs a LaunchAgent that checks
+   every screen on login and once a minute after, and changes only the ones
+   showing the wrong picture. A Mac asleep at midnight catches up when it
+   wakes. Each display gets the render of its shape: an ultrawide screen (wider
+   than 2.2:1, like the ASUS XG43VQ) gets the 3840×1200 one, and every other
+   screen, the MacBook's own included, gets the MacBook's. Unplugging a display
+   can hand its picture to the screen that's left; within a minute that screen
+   is back to its own. It sets the picture through NSWorkspace rather than
    System Events, so there is no permission prompt — only the usual *Background
    Items Added* notice. macOS only changes the Space in front of each display,
-   so other Spaces update when they're in front for a run. The log is
+   so other Spaces update when they come to the front. The log is
    `~/Library/Logs/annum.log`, and `sh annum.sh uninstall` removes everything.
+   Run `install` again after updating the script to pick up changes.
 
 ## Config
 
