@@ -18,7 +18,7 @@ const SECRET_PATTERNS = [
   [/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/, 'email address'],
 ]
 
-const TEXT = /\.(mjs|js|ts|json|md|html|css|ya?ml|txt)$/
+const TEXT = /\.(mjs|js|ts|json|md|html|css|ya?ml|txt|sh)$/
 
 const tracked = () => {
   const staged = execSync('git diff --cached --name-only --diff-filter=ACM', { encoding: 'utf8' })

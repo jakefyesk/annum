@@ -2,24 +2,28 @@
 
 A year, one dot at a time.
 
-A lock screen wallpaper that renders the current year as a horizontal dot grid —
-seven rows tall, read left to right, so it scans like a progress bar rather than a
-calendar. Significant dates become emoji markers, date ranges tint their dots, and
-the footer counts down to whatever comes next.
+A lock screen wallpaper — with matching desktops for a MacBook Pro 14″ and an
+ultrawide monitor — that renders the current year as a horizontal dot grid: seven
+rows tall, read left to right, so it scans like a progress bar rather than a
+calendar. Significant dates become
+emoji markers, date ranges tint their dots, and the footer counts down to whatever
+comes next.
 
-Everything runs on GitHub: Actions renders the images, Pages serves them, and an
-iOS Shortcut sets one as your wallpaper each morning. No server, no cron, no
-third-party account.
+Everything runs on GitHub: Actions renders the images, Pages serves them, an iOS
+Shortcut sets one as your phone's wallpaper each morning, and a LaunchAgent does
+the same on the Mac. No server, no cron, no third-party account.
 
 ---
 
 ## How it works
 
 Every day of the year is rendered ahead of time. Your phone resolves today's date
-locally and fetches that file:
+locally and fetches that file, and so does your Mac:
 
 ```
-https://<user>.github.io/annum/w/<slug>/2026-09-22.png
+https://<user>.github.io/annum/w/<slug>/2026-09-22.png             iPhone, 1290×2796
+https://<user>.github.io/annum/w/<slug>/desktop/2026-09-22.png     MacBook Pro 14″, 3024×1964
+https://<user>.github.io/annum/w/<slug>/ultrawide/2026-09-22.png   32:10 ultrawide, 3840×1200
 ```
 
 This is why there is no scheduled workflow. Nothing needs to keep a "current"
@@ -28,8 +32,8 @@ and no 60-day inactivity timer to work around. It also means the date is always
 correct — the phone knows its own timezone, including DST and travel, which a
 server rendering on a fixed schedule does not.
 
-Two years are rendered at a time (~15 MB, against a 1 GB Pages limit), so the
-year rollover needs no attention either.
+Two years are rendered at a time (~60 MB for all three screens, against a 1 GB
+Pages limit), so the year rollover needs no attention either.
 
 ## Privacy
 
@@ -108,10 +112,12 @@ conversation — "add the marathon on 1 November" is enough.
 
 1. **Build your config.** Open the Pages site, add milestones and ranges, and
    watch the preview. The page is static and sends nothing anywhere.
-2. **Store it.** Copy the base64 blob into `Settings → Secrets and variables →
-   Actions → Variables`, named `ANNUM_CONFIG` — a variable, not a secret, so it
-   can be read back and edited later. Then add `ANNUM_SLUG` as a *secret*
-   (`openssl rand -hex 16`) to move the wallpapers off a guessable URL.
+2. **Store it.** Save the downloaded JSON as `config.json` and run
+   `node scripts/events.mjs push`, which writes the `ANNUM_CONFIG` secret that
+   CI reads and the variable that mirrors it (see Privacy). By hand, paste the
+   base64 blob into `Settings → Secrets and variables → Actions` as both.
+   Then add `ANNUM_SLUG` as a *secret* (`openssl rand -hex 16`) to move the
+   wallpapers off a guessable URL.
 3. **Deploy.** `Settings → Pages → Source: GitHub Actions`, then run the workflow.
 4. **Automate the phone.** Shortcuts → Automation → Time of Day, 6:00 AM, Daily,
    Run Immediately → Create New Shortcut:
@@ -122,6 +128,24 @@ conversation — "add the marathon on 1 November" is enough.
    - **Set Wallpaper Photo** — Lock Screen. Tap the arrow and disable both
      *Crop to Subject* and *Show Preview*, or iOS will crop the image and ask for
      confirmation every morning.
+5. **Automate the Mac.** Download [`mac/annum.sh`](mac/annum.sh) and run
+   `sh annum.sh install`. When it asks, paste the phone's wallpaper URL — with
+   or without a date — and it finds the desktop images beside it:
+
+   ```
+   https://<user>.github.io/annum/w/<slug>
+   ```
+
+   It checks today's image exists, then installs a LaunchAgent that sets the
+   desktop picture on login and every hour after. A Mac asleep at midnight
+   catches up when it wakes. Each display gets the render of its shape: an
+   ultrawide screen (wider than 2.2:1, like the ASUS XG43VQ) gets the 3840×1200
+   one, and every other screen the MacBook's. A display plugged in between runs
+   picks up its picture at the next one. It sets the picture through NSWorkspace rather than
+   System Events, so there is no permission prompt — only the usual *Background
+   Items Added* notice. macOS only changes the Space in front of each display,
+   so other Spaces update when they're in front for a run. The log is
+   `~/Library/Logs/annum.log`, and `sh annum.sh uninstall` removes everything.
 
 ## Config
 
@@ -131,6 +155,10 @@ conversation — "add the marathon on 1 November" is enough.
   "redactLabels": false,
   "layout": { "top": 1180, "shape": "circle", "markerScale": 1.2 },
   "footer": { "showYear": true, "maxMilestones": 12 },
+  "desktop": {
+    "layout": { "top": "auto", "balance": 1.25, "corners": 2 },
+    "footer": { "columns": 3, "safeBottom": 260 }
+  },
   "milestones": [
     { "date": "2026-11-01", "label": "Marathon", "emoji": "🏃" },
     { "date": "2026-07-04", "private": true, "publicLabel": "Countdown" }
@@ -145,6 +173,22 @@ conversation — "add the marathon on 1 November" is enough.
 clears the widget stack on an iPhone 14 Pro Max; shift it if your lock screen is
 laid out differently. `markerScale` sizes milestone markers relative to the dot
 pitch.
+
+`desktop` and `ultrawide` take the same `layout` and `footer` keys for the Mac
+wallpapers, each in its own pixels. Only the look carries over from the top
+level — `shape`, `markerScale`, `dotRatio`, `showYear`, `maxMilestones` — because
+a phone's `top` of 1180 is most of the way down a laptop screen. The defaults put
+the grid below the menu bar, the notch and the lock screen clock, and stop the
+milestone list, split into columns, above the Dock. Set `"desktop": false` or
+`"ultrawide": false` to skip rendering one.
+
+Both desktops centre themselves the way a picture framer cuts a mat. With
+`"top": "auto"`, margins at the top and sides are about equal and the bottom one
+is `balance` (1.25) times the top, so the block's centre sits just above the
+middle, where it reads as centred rather than sagging. It never rises above
+`safeTop`, the lock screen clock's limit. A number instead puts the grid's top
+row at that pixel. `corners` draws faint corner marks one dot-pitch outside the
+block, that many pixels wide; `0` turns them off.
 
 Below the grid the year countdown comes first and carries the most weight, so a
 milestone number can never be misread as days left in the year. Beneath it every
@@ -171,11 +215,19 @@ npm run guard     # the pre-commit check, run by hand
 
 `src/calendar.mjs` emits an SVG string and touches nothing else — no filesystem,
 no network. The browser preview and the CI renderer import the same module, so
-what you see while configuring is what lands on your phone.
+what you see while configuring is what lands on your screens. Each device is an
+entry in its `DEVICES` table: a canvas size, safe areas, and a `scale` for type
+that was drawn for the phone.
 
-One performance note worth keeping: the renderer is constructed per image, and
-passing fonts as `fontBuffers` re-parses them every time — 355 ms per render
-versus 50 ms with `fontDirs`. Use `fontDirs` anywhere there's a filesystem.
+Two performance notes worth keeping:
+
+- The renderer is constructed per image, and passing fonts as `fontBuffers`
+  re-parses them every time — 355 ms per render versus 50 ms with `fontDirs`. Use
+  `fontDirs` anywhere there's a filesystem.
+- Use `renderAsync`, not `new Resvg(svg).render()`. The synchronous render never
+  frees its pixmap: two years of phone wallpapers alone peaked at 10.7 GB. Adding the
+  desktop would have exhausted a runner. The async path peaks near 1.2 GB for
+  both devices.
 
 ## Credits
 

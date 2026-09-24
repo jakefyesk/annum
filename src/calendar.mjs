@@ -20,11 +20,8 @@ const esc = (s) =>
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 
-export const DEFAULT_LAYOUT = {
-  width: 1290,
-  height: 2796,
-  marginX: 96,
-  top: 1180,
+// How the calendar looks, whatever it's drawn on.
+const STYLE = {
   dotRatio: 0.62,
   markerScale: 1.2,
   shape: 'circle',
@@ -32,9 +29,73 @@ export const DEFAULT_LAYOUT = {
 
 export const DEFAULT_FOOTER = {
   showYear: true,
-  gap: 118,          // breathing room between the year count and the list
   maxMilestones: 12, // the list also self-limits to the space above safeBottom
-  safeBottom: 340,   // keep clear of the lock screen's bottom controls
+}
+
+// Every screen the calendar is drawn for, in that screen's own pixels. The type
+// and its spacing were drawn for the phone; `scale` sizes them for the others.
+export const DEVICES = {
+  // iPhone 14 Pro Max lock screen. 1180 clears the clock and widget stack.
+  phone: {
+    layout: { width: 1290, height: 2796, marginX: 96, top: 1180, scale: 1 },
+    footer: {
+      gap: 118,        // breathing room between the year count and the list
+      safeBottom: 340, // keep clear of the lock screen's bottom controls
+      columns: 1,
+    },
+  },
+  // The desktops sit in a picture framer's mat: side and top margins about
+  // equal, the bottom a quarter larger so the block doesn't look to be
+  // sliding down (framers weight the bottom 8-25%). That puts its centre just
+  // above the middle, where the eye reads it as centred. `safeTop` keeps the
+  // month labels below the lock screen clock, 263pt down on both screens.
+  //
+  // MacBook Pro 14" at its native 3024x1964, at 2x. Equal top and sides under
+  // the clock's limit make the block two thirds of the width, with a whole
+  // 38px dot pitch; the right margin clears the first column of desktop icons.
+  desktop: {
+    layout: {
+      width: 3024, height: 1964, marginX: 505, scale: 1.3,
+      top: 'auto', balance: 1.25, safeTop: 526, corners: 2,
+    },
+    footer: { gap: 153, safeBottom: 260, columns: 3 },
+  },
+  // 43" 32:10 super-ultrawide (ASUS ROG Strix XG43VQ) at its native 3840x1200,
+  // which macOS drives at 1x. The MacBook's proportions, with type a little
+  // larger than a pure angular match because 1x has half the pixels per glyph.
+  // The margins make the dot pitch a whole 32px, so every dot draws alike. The
+  // screen is too short for the mat's bottom weighting with a full list, so
+  // the clock's limit holds the block there; shorter lists centre properly.
+  ultrawide: {
+    layout: {
+      width: 3840, height: 1200, marginX: 1072, scale: 1.1,
+      top: 'auto', balance: 1.25, safeTop: 268, corners: 1,
+    },
+    footer: { gap: 112, safeBottom: 130, columns: 3 },
+  },
+}
+
+// Settings that describe the look rather than the screen, so every device
+// inherits them from the top level. Everything else is per device: 1180px is a
+// sensible top on a phone and most of the way down a laptop.
+const SHARED = {
+  layout: ['shape', 'markerScale', 'dotRatio'],
+  footer: ['showYear', 'maxMilestones'],
+}
+
+// The phone reads the top-level `layout` and `footer`, as it always has. Any
+// other device reads the same two keys under its own name — `desktop.layout.top`
+// — and falls back to the top level only for SHARED settings.
+export function resolveDevice(config = {}, device = 'phone') {
+  const preset = DEVICES[device]
+  if (!preset) throw new Error(`unknown device "${device}" (expected ${Object.keys(DEVICES).join(' or ')})`)
+  const own = device === 'phone' ? config : (config[device] ?? {})
+  const shared = (key) =>
+    Object.fromEntries(SHARED[key].filter((k) => config[key]?.[k] !== undefined).map((k) => [k, config[key][k]]))
+  return {
+    layout: { ...STYLE, ...preset.layout, ...shared('layout'), ...own.layout },
+    footer: { ...DEFAULT_FOOTER, ...preset.footer, ...shared('footer'), ...own.footer },
+  }
 }
 
 function buildYear(year, today) {
@@ -85,10 +146,11 @@ function spriteFor(sprites, emoji) {
   return sprites[emoji] ?? sprites[bare] ?? sprites[bare + '\uFE0F'] ?? null
 }
 
-export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = {} }) {
-  const layout = { ...DEFAULT_LAYOUT, ...over }
-  const footer = { ...DEFAULT_FOOTER, ...(config.footer ?? {}) }
+export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {} }) {
+  const { layout, footer } = resolveDevice(config, device)
   const { width: W, height: H } = layout
+  // Type and spacing in phone pixels, scaled to this device.
+  const px = (v) => Math.round(v * layout.scale * 10) / 10
   const year = Number(todayStr.slice(0, 4))
   const today = utc(todayStr)
   const redactAll = config.redactLabels === true
@@ -107,13 +169,42 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
     if (d) d.milestone = m
   }
 
+  // Every milestone in the year, listed under the grid in calendar order rather
+  // than by proximity, so the list reads as a year at a glance. Past dates
+  // count backwards.
+  const all = (config.milestones ?? [])
+    .slice()
+    .filter((m) => m.date?.startsWith(String(year)))
+    .sort((a, b) => utc(a.date) - utc(b.date))
+  // Anything but a positive number means one column. JSON's 1e400 is Infinity.
+  const asked = Math.floor(Number(footer.columns))
+  const listCols = Number.isFinite(asked) ? Math.max(1, asked) : 1
+
   const cols = Math.max(...days.map((d) => d.col)) + 1
   const pitch = (W - 2 * layout.marginX) / cols
   const r = (pitch * layout.dotRatio) / 2
   const gridW = cols * pitch
   const x0 = (W - gridW) / 2 + pitch / 2
-  const y0 = layout.top
   const gridH = 7 * pitch
+
+  // The block runs from the month labels' cap tops, this far above the grid
+  // (JetBrains Mono's caps are 0.73em tall), to the last list row.
+  const above = px(46) + px(17) * 0.73
+
+  // `top: 'auto'` places the whole block so the space below it is `balance`
+  // times the space above, and never starts above `safeTop`. The list holds
+  // every milestone in the year, so the block keeps its height, and its place,
+  // all year.
+  const autoTop = () => {
+    const rows = Math.ceil(Math.min(all.length, footer.maxMilestones) / listCols)
+    const yearLine = gridH + px(74)
+    const listFrom = footer.showYear ? yearLine + footer.gap : yearLine
+    const lastDot = gridH - pitch / 2 + r
+    const below = rows ? listFrom + (rows - 1) * px(46) : footer.showYear ? yearLine : lastDot
+    const space = (H - above - below) / (1 + (layout.balance ?? 1))
+    return Math.round(Math.max(layout.safeTop ?? 0, space) + above)
+  }
+  const y0 = layout.top === 'auto' ? autoTop() : layout.top
   const left = x0 - pitch / 2
   const right = x0 + gridW - pitch / 2
 
@@ -122,9 +213,9 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
   for (let m = 0; m < 12; m++) {
     const d = byDate.get(`${year}-${String(m + 1).padStart(2, '0')}-01`)
     const x = x0 + d.col * pitch
-    out.push(`<rect x="${(x - 1).toFixed(1)}" y="${y0 - 34}" width="2" height="12" fill="${THEME.future}"/>`)
+    out.push(`<rect x="${(x - px(1)).toFixed(1)}" y="${y0 - px(34)}" width="${px(2)}" height="${px(12)}" fill="${THEME.future}"/>`)
     out.push(
-      `<text x="${x.toFixed(1)}" y="${y0 - 46}" font-family="JetBrains Mono" font-weight="500" font-size="17" letter-spacing="1.5" fill="${THEME.label}" text-anchor="middle">${MONTHS[m]}</text>`
+      `<text x="${x.toFixed(1)}" y="${y0 - px(46)}" font-family="JetBrains Mono" font-weight="500" font-size="${px(17)}" letter-spacing="${px(1.5)}" fill="${THEME.label}" text-anchor="middle">${MONTHS[m]}</text>`
     )
   }
 
@@ -166,7 +257,9 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
   // The year count leads, then the full milestone list in calendar order.
 
   const daysTo = (m) => Math.round((utc(m.date) - today) / DAY)
-  let y = y0 + gridH + 74
+  let y = y0 + gridH + px(74)
+  // The block's lowest baseline so far, for the corner marks.
+  let bottom = y0 + gridH - pitch / 2 + r
 
   // The year countdown sits directly under the grid and carries the most
   // weight, so a milestone's number can never be mistaken for it.
@@ -178,54 +271,86 @@ export function renderSVG({ todayStr, config = {}, layout: over = {}, sprites = 
     const big = String(daysLeft)
 
     out.push(
-      `<text x="${left.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="68" letter-spacing="-2" fill="${THEME.past}">${big}</text>`
+      `<text x="${left.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="${px(68)}" letter-spacing="${px(-2)}" fill="${THEME.past}">${big}</text>`
     )
-    const tx = left + big.length * 41 + 16
+    const tx = left + big.length * px(41) + px(16)
     out.push(
-      `<text x="${tx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="28" letter-spacing="3" fill="${THEME.past}">DAYS LEFT</text>`
+      `<text x="${tx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="${px(28)}" letter-spacing="${px(3)}" fill="${THEME.past}">DAYS LEFT</text>`
     )
     // Same baseline, opposite edge: the year and percentage read as context for
     // the count rather than as a second line of it.
     out.push(
-      `<text x="${right.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${THEME.dim}" text-anchor="end">IN ${year} · ${pct}%</text>`
+      `<text x="${right.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="${px(24)}" letter-spacing="${px(3)}" fill="${THEME.dim}" text-anchor="end">IN ${year} · ${pct}%</text>`
     )
+    bottom = y
     y += footer.gap
   }
 
-  // Every milestone, in calendar order rather than by proximity, so the list
-  // reads as a year at a glance. Past dates count backwards.
-  const all = (config.milestones ?? [])
-    .slice()
-    .filter((m) => m.date?.startsWith(String(year)))
-    .sort((a, b) => utc(a.date) - utc(b.date))
-
-  const ROW = 46
+  // A wide screen splits the list into columns, filled top to bottom and then
+  // left to right, so each column still reads in calendar order. They're filled
+  // as evenly as possible, earlier columns taking the remainder, so four items
+  // across three columns span the width rather than leaving the last one empty.
+  const ROW = px(46)
   const room = Math.max(0, Math.floor((layout.height - footer.safeBottom - y) / ROW))
-  const shown = all.slice(0, Math.min(room, footer.maxMilestones))
+  const shown = all.slice(0, Math.min(room * listCols, footer.maxMilestones))
+  const used = Math.min(listCols, shown.length)
+  const perCol = Math.floor(shown.length / listCols)
+  const extra = shown.length % listCols
+  const colW = (right - left) / listCols
 
-  // No markers here — the emoji live in the grid, where they mark a position.
-  // Repeating them down the list just adds colour the list doesn't need.
-  const COUNT_RIGHT = left + 96
-  const LABEL_LEFT = left + 124
+  // A label stops a gutter short of the next column, or at the grid's edge when
+  // no column follows it. JetBrains Mono advances 0.6em per glyph plus the
+  // letter-spacing, which the last glyph doesn't need. Composed characters are
+  // what's counted, so a decomposed é isn't charged two cells.
+  const clip = (s, width) => {
+    const fit = Math.floor((width + px(3)) / (px(24) * 0.6 + px(3)))
+    const chars = [...s.normalize('NFC')]
+    return chars.length > fit ? chars.slice(0, Math.max(0, fit - 1)).join('').trimEnd() + '…' : s
+  }
 
-  for (const m of shown) {
-    const n = daysTo(m)
-    const past = n < 0
-    const tone = past ? THEME.dim : THEME.label
+  for (let c = 0; c < used; c++) {
+    // No markers here — the emoji live in the grid, where they mark a position.
+    // Repeating them down the list just adds colour the list doesn't need.
+    const COUNT_RIGHT = left + c * colW + px(96)
+    const LABEL_LEFT = left + c * colW + px(124)
+    const labelWidth = (c === used - 1 ? right - left - c * colW : colW - px(40)) - px(124)
+    let row = y
 
-    // Right-align the counts so the column reads as a column.
-    const count = n === 0 ? 'TODAY' : String(n)
-    out.push(
-      `<text x="${COUNT_RIGHT.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="${n === 0 ? 700 : 500}" font-size="28" letter-spacing="0" fill="${n === 0 ? THEME.today : tone}" text-anchor="end">${count}</text>`
-    )
+    const from = c * perCol + Math.min(c, extra)
+    for (const m of shown.slice(from, from + perCol + (c < extra ? 1 : 0))) {
+      const n = daysTo(m)
+      const past = n < 0
+      const tone = past ? THEME.dim : THEME.label
 
-    const lbl = publicLabel(m, redactAll)
-    if (lbl) {
+      // Right-align the counts so the column reads as a column.
+      const count = n === 0 ? 'TODAY' : String(n)
       out.push(
-        `<text x="${LABEL_LEFT.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="24" letter-spacing="3" fill="${tone}" opacity="${past ? 0.75 : 1}">${esc(lbl.toUpperCase())}</text>`
+        `<text x="${COUNT_RIGHT.toFixed(1)}" y="${row}" font-family="JetBrains Mono" font-weight="${n === 0 ? 700 : 500}" font-size="${px(28)}" letter-spacing="0" fill="${n === 0 ? THEME.today : tone}" text-anchor="end">${count}</text>`
       )
+
+      const lbl = publicLabel(m, redactAll)
+      if (lbl) {
+        out.push(
+          `<text x="${LABEL_LEFT.toFixed(1)}" y="${row}" font-family="JetBrains Mono" font-weight="500" font-size="${px(24)}" letter-spacing="${px(3)}" fill="${tone}" opacity="${past ? 0.75 : 1}">${esc(clip(lbl.toUpperCase(), labelWidth))}</text>`
+        )
+      }
+      bottom = Math.max(bottom, row)
+      row += ROW
     }
-    y += ROW
+  }
+
+  // Corner marks: a mat implied only by its corners, one pitch outside the
+  // block and one pitch long, `corners` px wide and in a future day's grey.
+  // Snapped to the pixel grid so a 1px or 2px line stays crisp.
+  if (layout.corners > 0) {
+    const w = layout.corners
+    const snap = (v) => (w % 2 ? Math.round(v - 0.5) + 0.5 : Math.round(v))
+    const [x1, x2] = [snap(left - pitch), snap(right + pitch)]
+    const [y1, y2] = [snap(y0 - above - pitch), snap(bottom + pitch)]
+    const [ax1, ax2, ay1, ay2] = [snap(x1 + pitch), snap(x2 - pitch), snap(y1 + pitch), snap(y2 - pitch)]
+    out.push(
+      `<path d="M${x1} ${ay1}V${y1}H${ax1}M${ax2} ${y1}H${x2}V${ay1}M${x2} ${ay2}V${y2}H${ax2}M${ax1} ${y2}H${x1}V${ay2}" fill="none" stroke="${THEME.future}" stroke-width="${w}"/>`
+    )
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${out.join('')}</svg>`

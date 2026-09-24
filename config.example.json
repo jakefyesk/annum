@@ -47,5 +47,15 @@
     "gap": 118,
     "maxMilestones": 12,
     "safeBottom": 340
+  },
+  "desktop": {
+    "layout": {
+      "top": "auto",
+      "balance": 1.25
+    },
+    "footer": {
+      "columns": 3,
+      "safeBottom": 260
+    }
   }
 }
