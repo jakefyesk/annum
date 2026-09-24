@@ -193,8 +193,10 @@ block, that many pixels wide; `0` turns them off.
 Below the grid the year countdown comes first and carries the most weight, so a
 milestone number can never be misread as days left in the year. Beneath it every
 milestone is listed in calendar order — not by proximity — with past dates
-counting backwards (`-93`). The list trims itself to whatever fits above
-`footer.safeBottom`, which keeps it clear of the lock screen controls.
+counting backwards (`-93`). The list trims itself to `footer.maxMilestones` and
+to whatever fits above `footer.safeBottom`, which keeps it clear of the lock
+screen controls. When it trims, the oldest past dates go first, so every
+upcoming milestone stays listed as long as there's room.
 
 Emoji are Fluent Emoji 3D PNGs, because CI has no colour emoji font. Any of the
 ~1,600 emoji in `emoji/fluent-index.json` just works: if your config references
