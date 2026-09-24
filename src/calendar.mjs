@@ -44,34 +44,36 @@ export const DEVICES = {
       columns: 1,
     },
   },
-  // The desktops sit in a picture framer's mat: side and top margins about
-  // equal, the bottom a quarter larger so the block doesn't look to be
-  // sliding down (framers weight the bottom 8-25%). That puts its centre just
-  // above the middle, where the eye reads it as centred. `safeTop` keeps the
-  // month labels below the lock screen clock, 263pt down on both screens.
+  // The desktops sit in a picture framer's mat: the bottom margin a quarter
+  // larger than the top, so the block doesn't look to be sliding down
+  // (framers weight the bottom 8-25%). That puts its centre just above the
+  // middle, where the eye reads it as centred. `safeTop` keeps the month
+  // labels below the lock screen clock; the block now sits well clear of it.
   //
-  // MacBook Pro 14" at its native 3024x1964, at 2x. Equal top and sides under
-  // the clock's limit make the block two thirds of the width, with a whole
-  // 38px dot pitch; the right margin clears the first column of desktop icons.
+  // Both are small and quiet: dots and type shrink together, keeping the
+  // pitch-to-type ratio that makes this the same design, down to the smallest
+  // type that still reads (list labels at 10pt on the MacBook, month labels
+  // near 13px at 1x) and 20-character labels. Each margin makes the dot pitch
+  // a whole number of pixels, so every dot draws alike.
+  //
+  // MacBook Pro 14" at its native 3024x1964, at 2x: a 25px pitch, the block
+  // about two fifths of the width and a quarter of the height.
   desktop: {
     layout: {
-      width: 3024, height: 1964, marginX: 505, scale: 1.3,
+      width: 3024, height: 1964, marginX: 849.5, scale: 0.86,
       top: 'auto', balance: 1.25, safeTop: 526, corners: 2,
     },
-    footer: { gap: 153, safeBottom: 260, columns: 3 },
+    footer: { gap: 101, safeBottom: 260, columns: 3 },
   },
   // 43" 32:10 super-ultrawide (ASUS ROG Strix XG43VQ) at its native 3840x1200,
-  // which macOS drives at 1x. The MacBook's proportions, with type a little
-  // larger than a pure angular match because 1x has half the pixels per glyph.
-  // The margins make the dot pitch a whole 32px, so every dot draws alike. The
-  // screen is too short for the mat's bottom weighting with a full list, so
-  // the clock's limit holds the block there; shorter lists centre properly.
+  // which macOS drives at 1x: a 22px pitch. Its type stays a little larger
+  // than the MacBook's by angle, since 1x has half the pixels per glyph.
   ultrawide: {
     layout: {
-      width: 3840, height: 1200, marginX: 1072, scale: 1.1,
+      width: 3840, height: 1200, marginX: 1337, scale: 0.76,
       top: 'auto', balance: 1.25, safeTop: 268, corners: 1,
     },
-    footer: { gap: 112, safeBottom: 130, columns: 3 },
+    footer: { gap: 89, safeBottom: 130, columns: 3 },
   },
 }
 
@@ -201,8 +203,14 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
     const listFrom = footer.showYear ? yearLine + footer.gap : yearLine
     const lastDot = gridH - pitch / 2 + r
     const below = rows ? listFrom + (rows - 1) * px(46) : footer.showYear ? yearLine : lastDot
-    const space = (H - above - below) / (1 + (layout.balance ?? 1))
-    return Math.round(Math.max(layout.safeTop ?? 0, space) + above)
+    const balance = Number(layout.balance ?? 1)
+    const space = (H - above - below) / (1 + (Number.isFinite(balance) && balance >= 0 ? balance : 1))
+    // No lower than keeps the last list row above safeBottom, or the list would
+    // drop rows; the 1e-6 is slack for the room check's float division. Never
+    // higher than safeTop, rounding down included.
+    const lowest = rows ? Math.floor(H - footer.safeBottom - px(46) - below - 1e-6) : Infinity
+    const highest = Math.ceil(Number(layout.safeTop ?? 0) + above)
+    return Math.max(highest, Math.min(Math.round(space + above), lowest))
   }
   const y0 = layout.top === 'auto' ? autoTop() : layout.top
   const left = x0 - pitch / 2
@@ -347,16 +355,25 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
 
   // Corner marks: a mat implied only by its corners, one pitch outside the
   // block and one pitch long, `corners` px wide and in a future day's grey.
-  // Snapped to the pixel grid so a 1px or 2px line stays crisp.
-  if (layout.corners > 0) {
-    const w = layout.corners
-    const snap = (v) => (w % 2 ? Math.round(v - 0.5) + 0.5 : Math.round(v))
-    const [x1, x2] = [snap(left - pitch), snap(right + pitch)]
-    const [y1, y2] = [snap(y0 - above - pitch), snap(bottom + pitch)]
-    const [ax1, ax2, ay1, ay2] = [snap(x1 + pitch), snap(x2 - pitch), snap(y1 + pitch), snap(y2 - pitch)]
-    out.push(
-      `<path d="M${x1} ${ay1}V${y1}H${ax1}M${ax2} ${y1}H${x2}V${ay1}M${x2} ${ay2}V${y2}H${ax2}M${ax1} ${y2}H${x1}V${ay2}" fill="none" stroke="${THEME.future}" stroke-width="${w}"/>`
-    )
+  // Whole-pixel rects rather than a stroke, so every pixel of a 1px or 2px
+  // mark is solid and the two sides mirror exactly. Skipped outright if any
+  // would fall off the canvas, rather than drawn lopsided.
+  const w = Math.round(Number(layout.corners))
+  if (w > 0) {
+    const len = Math.round(pitch) + Math.floor(w / 2)
+    const xl = Math.round(left - pitch) - Math.floor(w / 2)
+    const xr = Math.round(right + pitch) - Math.ceil(w / 2)
+    const yt = Math.round(y0 - above - pitch) - Math.floor(w / 2)
+    const yb = Math.round(bottom + pitch) - Math.ceil(w / 2)
+    if (xl >= 0 && xr + w <= W && yt >= 0 && yb + w <= H) {
+      const arms = [
+        [xl, yt, w, len], [xl, yt, len, w], [xr, yt, w, len], [xr + w - len, yt, len, w],
+        [xl, yb + w - len, w, len], [xl, yb, len, w], [xr, yb + w - len, w, len], [xr + w - len, yb, len, w],
+      ]
+      out.push(
+        `<g fill="${THEME.future}">${arms.map(([x, y, aw, ah]) => `<rect x="${x}" y="${y}" width="${aw}" height="${ah}"/>`).join('')}</g>`
+      )
+    }
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${out.join('')}</svg>`

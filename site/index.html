@@ -137,7 +137,7 @@
             <select id="shape"><option value="circle">circle</option><option value="square">square</option></select>
           </td></tr>
           <tr><td style="color:var(--dim)">Top offset</td><td>
-            <input id="top" type="number" step="20" autocomplete="off" placeholder="auto" style="width:90px"> px
+            <input id="top" type="number" step="20" autocomplete="off" style="width:90px"> px
           </td></tr>
           <tr><td style="color:var(--dim)">Preview date</td><td>
             <input id="today" type="date">
@@ -217,7 +217,10 @@ function draw() {
   // The preview renders the exact config it hands you, so the two can't disagree.
   const json = { _example: false, years: [new Date().getUTCFullYear(), new Date().getUTCFullYear() + 1],
                  layout: { top: state.top.phone, shape: $('#shape').value },
-                 ...Object.fromEntries(Object.keys(DEVICES).filter((id) => id !== 'phone')
+                 // Only offsets you've changed, so the config doesn't pin a preset
+                 // (auto-centring above all) that a later version may improve.
+                 ...Object.fromEntries(Object.keys(DEVICES)
+                   .filter((id) => id !== 'phone' && state.top[id] !== DEVICES[id].layout.top)
                    .map((id) => [id, { layout: { top: state.top[id] } }])),
                  milestones: state.milestones.filter((m) => m.date),
                  ranges: state.ranges.filter((r) => r.start && r.end) }
@@ -280,18 +283,33 @@ $('#dl').onclick = () => {
   a.href = URL.createObjectURL(blob); a.download = 'config.json'; a.click()
   URL.revokeObjectURL(a.href)
 }
-$('#device').oninput = () => { $('#top').value = state.top[$('#device').value]; draw() }
+// The field shows the offset in use: a number, or empty with the device's own
+// preset as the placeholder ("auto" on the desktops).
+const showTop = () => {
+  const device = $('#device').value
+  $('#top').placeholder = String(DEVICES[device].layout.top)
+  $('#top').value = typeof state.top[device] === 'number' ? state.top[device] : ''
+}
+// Where auto put the grid: the January tick, the preview's first future-grey
+// rect, sits px(34) above it.
+const autoTop = (device) =>
+  +$('#preview svg rect[fill="#333333"]').getAttribute('y') + Math.round(34 * DEVICES[device].layout.scale * 10) / 10
+$('#device').oninput = () => { showTop(); draw() }
 $('#top').oninput = () => {
   const device = $('#device').value
-  state.top[device] = Number($('#top').value) || DEVICES[device].layout.top
+  let top = Number($('#top').value)
+  // An arrow key or the spinner steps an empty field from 0; step from where
+  // auto put the grid instead.
+  if (state.top[device] === 'auto' && Math.abs(top) === 20) $('#top').value = top += autoTop(device)
+  state.top[device] = top || DEVICES[device].layout.top
   draw()
 }
 // Once editing ends, show the offset actually in use, not a cleared or 0 field.
-$('#top').onchange = () => { $('#top').value = state.top[$('#device').value] }
+$('#top').onchange = showTop
 for (const id of ['#shape', '#today']) $(id).oninput = draw
 
 $('#today').value = todayISO
-$('#top').value = state.top[$('#device').value]
+showTop()
 rowsM(); rowsR()
 state.milestones.forEach((m) => loadSprite(m.emoji))
 draw()

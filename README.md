@@ -32,7 +32,7 @@ and no 60-day inactivity timer to work around. It also means the date is always
 correct — the phone knows its own timezone, including DST and travel, which a
 server rendering on a fixed schedule does not.
 
-Two years are rendered at a time (~60 MB for all three screens, against a 1 GB
+Two years are rendered at a time (~45 MB for all three screens, against a 1 GB
 Pages limit), so the year rollover needs no attention either.
 
 ## Privacy
@@ -136,16 +136,20 @@ conversation — "add the marathon on 1 November" is enough.
    https://<user>.github.io/annum/w/<slug>
    ```
 
-   It checks today's image exists, then installs a LaunchAgent that sets the
-   desktop picture on login and every hour after. A Mac asleep at midnight
-   catches up when it wakes. Each display gets the render of its shape: an
-   ultrawide screen (wider than 2.2:1, like the ASUS XG43VQ) gets the 3840×1200
-   one, and every other screen the MacBook's. A display plugged in between runs
-   picks up its picture at the next one. It sets the picture through NSWorkspace rather than
+   It checks today's image exists, then installs a LaunchAgent that checks
+   every screen on login, whenever a display is plugged in or unplugged, and
+   once a minute as a backstop, and changes only the ones showing the wrong
+   picture. A Mac asleep at midnight catches up when it
+   wakes. Each display gets the render of its shape: an ultrawide screen (wider
+   than 2.2:1, like the ASUS XG43VQ) gets the 3840×1200 one, and every other
+   screen, the MacBook's own included, gets the MacBook's. Unplugging a display
+   can hand its picture to the screen that's left; within a minute that screen
+   is back to its own. It sets the picture through NSWorkspace rather than
    System Events, so there is no permission prompt — only the usual *Background
    Items Added* notice. macOS only changes the Space in front of each display,
-   so other Spaces update when they're in front for a run. The log is
+   so other Spaces update when they come to the front. The log is
    `~/Library/Logs/annum.log`, and `sh annum.sh uninstall` removes everything.
+   Run `install` again after updating the script to pick up changes.
 
 ## Config
 
@@ -183,12 +187,20 @@ milestone list, split into columns, above the Dock. Set `"desktop": false` or
 `"ultrawide": false` to skip rendering one.
 
 Both desktops centre themselves the way a picture framer cuts a mat. With
-`"top": "auto"`, margins at the top and sides are about equal and the bottom one
-is `balance` (1.25) times the top, so the block's centre sits just above the
-middle, where it reads as centred rather than sagging. It never rises above
-`safeTop`, the lock screen clock's limit. A number instead puts the grid's top
-row at that pixel. `corners` draws faint corner marks one dot-pitch outside the
-block, that many pixels wide; `0` turns them off.
+`"top": "auto"`, the space below the block is `balance` (1.25) times the space
+above it, so its centre sits just above the middle, where it reads as centred
+rather than sagging. It never starts higher than `safeTop`, the lock screen
+clock's limit, and never so low that the list loses a row. Both blocks are
+kept small and quiet, dots and type shrinking together down to the smallest
+type that still reads, so the negative space around them does the framing.
+A number instead puts the grid's top row at that pixel. `corners` draws faint
+corner marks one dot-pitch outside the block, that many pixels wide; `0` turns
+them off.
+
+A config made on the site or from the example before centring arrived pins
+`desktop.layout.top` to 620 (and `ultrawide.layout.top` to 333), which turns
+it off. `node scripts/events.mjs pull`, delete those keys from `config.json`,
+then `push`.
 
 Below the grid the year countdown comes first and carries the most weight, so a
 milestone number can never be misread as days left in the year. Beneath it every
