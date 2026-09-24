@@ -156,13 +156,39 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
     if (d) d.milestone = m
   }
 
+  // Every milestone in the year, listed under the grid in calendar order rather
+  // than by proximity, so the list reads as a year at a glance. Past dates
+  // count backwards.
+  const all = (config.milestones ?? [])
+    .slice()
+    .filter((m) => m.date?.startsWith(String(year)))
+    .sort((a, b) => utc(a.date) - utc(b.date))
+  // Anything but a positive number means one column. JSON's 1e400 is Infinity.
+  const asked = Math.floor(Number(footer.columns))
+  const listCols = Number.isFinite(asked) ? Math.max(1, asked) : 1
+
   const cols = Math.max(...days.map((d) => d.col)) + 1
   const pitch = (W - 2 * layout.marginX) / cols
   const r = (pitch * layout.dotRatio) / 2
   const gridW = cols * pitch
   const x0 = (W - gridW) / 2 + pitch / 2
-  const y0 = layout.top
   const gridH = 7 * pitch
+
+  // `top: 'auto'` places the whole block, from the month labels' cap tops to
+  // the last list row, so the space below it is `balance` times the space
+  // above, and never starts above `safeTop`. The list holds every milestone in
+  // the year, so the block keeps its height, and its place, all year.
+  const autoTop = () => {
+    const above = px(46) + px(17) * 0.73 // JetBrains Mono's caps are 0.73em tall
+    const rows = Math.ceil(Math.min(all.length, footer.maxMilestones) / listCols)
+    const yearLine = gridH + px(74)
+    const listFrom = footer.showYear ? yearLine + footer.gap : yearLine
+    const lastDot = gridH - pitch / 2 + r
+    const below = rows ? listFrom + (rows - 1) * px(46) : footer.showYear ? yearLine : lastDot
+    const space = (H - above - below) / (1 + layout.balance)
+    return Math.round(Math.max(layout.safeTop ?? 0, space) + above)
+  }
+  const y0 = layout.top === 'auto' ? autoTop() : layout.top
   const left = x0 - pitch / 2
   const right = x0 + gridW - pitch / 2
 
@@ -241,21 +267,11 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
     y += footer.gap
   }
 
-  // Every milestone, in calendar order rather than by proximity, so the list
-  // reads as a year at a glance. Past dates count backwards.
-  const all = (config.milestones ?? [])
-    .slice()
-    .filter((m) => m.date?.startsWith(String(year)))
-    .sort((a, b) => utc(a.date) - utc(b.date))
-
   // A wide screen splits the list into columns, filled top to bottom and then
   // left to right, so each column still reads in calendar order. They're filled
   // as evenly as possible, earlier columns taking the remainder, so four items
   // across three columns span the width rather than leaving the last one empty.
   const ROW = px(46)
-  // Anything but a positive number means one column. JSON's 1e400 is Infinity.
-  const asked = Math.floor(Number(footer.columns))
-  const listCols = Number.isFinite(asked) ? Math.max(1, asked) : 1
   const room = Math.max(0, Math.floor((layout.height - footer.safeBottom - y) / ROW))
   const shown = all.slice(0, Math.min(room * listCols, footer.maxMilestones))
   const used = Math.min(listCols, shown.length)
