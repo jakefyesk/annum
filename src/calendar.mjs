@@ -292,7 +292,13 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   // across three columns span the width rather than leaving the last one empty.
   const ROW = px(46)
   const room = Math.max(0, Math.floor((layout.height - footer.safeBottom - y) / ROW))
-  const shown = all.slice(0, Math.min(room * listCols, footer.maxMilestones))
+  // When the year won't fit, the oldest past dates go first: the list shows the
+  // latest run of consecutive milestones that still starts at or before the next
+  // upcoming one. If the upcoming ones alone overflow, that keeps the nearest.
+  const fits = Math.max(0, Math.floor(Math.min(room * listCols, footer.maxMilestones))) || 0
+  const next = all.findIndex((m) => daysTo(m) >= 0)
+  const start = Math.min(next === -1 ? all.length : next, Math.max(0, all.length - fits))
+  const shown = all.slice(start, start + fits)
   const used = Math.min(listCols, shown.length)
   const perCol = Math.floor(shown.length / listCols)
   const extra = shown.length % listCols
