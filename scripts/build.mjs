@@ -4,7 +4,7 @@ import { renderAsync } from '@resvg/resvg-js'
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { renderSVG, resolveDevice } from '../src/calendar.mjs'
+import { renderSVG, resolveDevice, DEVICES } from '../src/calendar.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -98,11 +98,14 @@ const DIST = join(ROOT, 'dist')
 rmSync(DIST, { recursive: true, force: true })
 const outDir = join(DIST, 'w', SLUG)
 
-// The phone keeps the URL its Shortcut already points at. The desktop gets its
-// own folder beside it, and renders unless the config says `"desktop": false`.
+// The phone keeps the URL its Shortcut already points at. Every other device
+// gets a folder of its own name beside it, and renders unless the config says
+// `"<device>": false`.
 const devices = [
   { device: 'phone', dir: outDir },
-  ...(config.desktop === false ? [] : [{ device: 'desktop', dir: join(outDir, 'desktop') }]),
+  ...Object.keys(DEVICES)
+    .filter((device) => device !== 'phone' && config[device] !== false)
+    .map((device) => ({ device, dir: join(outDir, device) })),
 ]
 
 const jobs = []
@@ -156,4 +159,5 @@ console.log(
     `in ${((Date.now() - t0) / 1000).toFixed(1)}s`
 )
 console.log(`${(bytes / 1048576).toFixed(1)} MB before quantisation`)
-console.log(`published under /w/${SLUG || ''}${devices.length > 1 ? ', the desktop in desktop/' : ''}`)
+const others = devices.slice(1).map((d) => `${d.device}/`)
+console.log(`published under /w/${SLUG || ''}${others.length ? `, with ${others.join(' and ')} beside it` : ''}`)

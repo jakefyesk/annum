@@ -131,7 +131,7 @@
       <div class="body">
         <table>
           <tr><td style="color:var(--dim)">Device</td><td>
-            <select id="device" autocomplete="off"><option value="phone">iPhone</option><option value="desktop">MacBook Pro 14″</option></select>
+            <select id="device" autocomplete="off"><option value="phone">iPhone</option><option value="desktop">MacBook Pro 14″</option><option value="ultrawide">Ultrawide 3840×1200</option></select>
           </td></tr>
           <tr><td style="color:var(--dim)">Shape</td><td>
             <select id="shape"><option value="circle">circle</option><option value="square">square</option></select>
@@ -217,7 +217,8 @@ function draw() {
   // The preview renders the exact config it hands you, so the two can't disagree.
   const json = { _example: false, years: [new Date().getUTCFullYear(), new Date().getUTCFullYear() + 1],
                  layout: { top: state.top.phone, shape: $('#shape').value },
-                 desktop: { layout: { top: state.top.desktop } },
+                 ...Object.fromEntries(Object.keys(DEVICES).filter((id) => id !== 'phone')
+                   .map((id) => [id, { layout: { top: state.top[id] } }])),
                  milestones: state.milestones.filter((m) => m.date),
                  ranges: state.ranges.filter((r) => r.start && r.end) }
   const device = $('#device').value

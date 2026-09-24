@@ -16,52 +16,71 @@ DIR="$HOME/Library/Application Support/annum"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LOG="$HOME/Library/Logs/annum.log"
 
-# NSWorkspace rather than System Events: no Apple Events means no automation
-# permission prompt, which a LaunchAgent has no window to show.
-set_picture() {
+# `screens wide` prints yes if any connected screen is ultrawide, and
+# `screens set DESKTOP [ULTRAWIDE]` gives each screen the picture of its shape.
+# The MacBook is 1.54:1 and 16:9 is 1.78:1; the XG43VQ is 3.2:1, so anything
+# past 2.2:1 counts as ultrawide. NSWorkspace rather than System Events: no
+# Apple Events means no automation prompt, which a LaunchAgent has no window
+# to show.
+screens() {
   osascript -l JavaScript -e '
     ObjC.import("AppKit")
+    const wide = (s) => s.frame.size.width / s.frame.size.height > 2.2
     function run(argv) {
-      const url = $.NSURL.fileURLWithPath(argv[0])
       const screens = $.NSScreen.screens
-      for (let i = 0; i < screens.count; i++) {
+      const all = []
+      for (let i = 0; i < screens.count; i++) all.push(screens.objectAtIndex(i))
+      if (argv[0] === "wide") return all.some(wide) ? "yes" : "no"
+      for (const s of all) {
+        const path = wide(s) && argv[2] ? argv[2] : argv[1]
         const ok = $.NSWorkspace.sharedWorkspace.setDesktopImageURLForScreenOptionsError(
-          url, screens.objectAtIndex(i), $.NSDictionary.dictionary, null)
+          $.NSURL.fileURLWithPath(path), s, $.NSDictionary.dictionary, null)
         if (!ok) throw new Error("macOS refused the desktop picture")
       }
-    }' "$1"
+    }' "$@"
+}
+
+# fetch URL FILE: downloads today's image unless it's already there.
+fetch() {
+  [ -s "$2" ] && return 0
+  # The retries cover waking from sleep before the network is back. -L
+  # because Pages redirects github.io to a custom domain when the account has
+  # one; without it curl saves the redirect page and exits 0.
+  if ! curl -fsSL --proto-redir =https --retry 5 --retry-delay 30 --retry-all-errors \
+    -o "$2.part" "$1"; then
+    rm -f "$2.part"
+    echo "$(date '+%F %T') could not fetch ${2#"$DIR"/}" >&2
+    return 1
+  fi
+  # Anything that isn't a PNG would become the default wallpaper and stay
+  # that way all day, since the file exists and is never fetched again.
+  if [ "$(dd if="$2.part" bs=1 skip=1 count=3 2>/dev/null)" != PNG ]; then
+    rm -f "$2.part"
+    echo "$(date '+%F %T') ${2#"$DIR"/} is not a PNG" >&2
+    return 1
+  fi
+  mv "$2.part" "$2"
+  echo "$(date '+%F %T') fetched ${2#"$DIR"/}"
 }
 
 cmd_run() {
   base=${1:?usage: annum.sh run URL}
   today=$(date +%F)
-  file="$DIR/$today.png"
-  mkdir -p "$DIR"
+  mkdir -p "$DIR/desktop" "$DIR/ultrawide"
+  fetch "$base/$today.png" "$DIR/desktop/$today.png" || exit 1
 
-  if [ ! -s "$file" ]; then
-    # The retries cover waking from sleep before the network is back. -L
-    # because Pages redirects github.io to a custom domain when the account has
-    # one; without it curl saves the redirect page and exits 0.
-    if ! curl -fsSL --proto-redir =https --retry 5 --retry-delay 30 --retry-all-errors \
-      -o "$file.part" "$base/$today.png"; then
-      rm -f "$file.part"
-      echo "$(date '+%F %T') could not fetch $today.png" >&2
-      exit 1
-    fi
-    # Anything that isn't a PNG would become the default wallpaper and stay
-    # that way all day, since the file exists and is never fetched again.
-    if [ "$(dd if="$file.part" bs=1 skip=1 count=3 2>/dev/null)" != PNG ]; then
-      rm -f "$file.part"
-      echo "$(date '+%F %T') $today.png is not a PNG" >&2
-      exit 1
-    fi
-    mv "$file.part" "$file"
-    echo "$(date '+%F %T') fetched $today.png"
+  # The ultrawide render is fetched only while such a screen is connected. If
+  # it's missing — not deployed yet, or "ultrawide": false — that screen gets
+  # the desktop picture rather than failing the run.
+  wide=
+  if [ "$(screens wide)" = yes ] &&
+    fetch "${base%/desktop}/ultrawide/$today.png" "$DIR/ultrawide/$today.png"; then
+    wide="$DIR/ultrawide/$today.png"
   fi
 
   # A new filename each day matters: macOS caches the picture by path and
   # won't redraw one whose path hasn't changed.
-  set_picture "$file"
+  screens set "$DIR/desktop/$today.png" ${wide:+"$wide"}
 
   # Keep a week. Spaces that weren't in front during a run still point at an
   # older file, and a deleted one turns into the default wallpaper on login.

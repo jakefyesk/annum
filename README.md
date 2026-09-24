@@ -2,9 +2,10 @@
 
 A year, one dot at a time.
 
-A lock screen wallpaper — and a matching MacBook Pro 14″ desktop — that renders
-the current year as a horizontal dot grid: seven rows tall, read left to right, so
-it scans like a progress bar rather than a calendar. Significant dates become
+A lock screen wallpaper — with matching desktops for a MacBook Pro 14″ and an
+ultrawide monitor — that renders the current year as a horizontal dot grid: seven
+rows tall, read left to right, so it scans like a progress bar rather than a
+calendar. Significant dates become
 emoji markers, date ranges tint their dots, and the footer counts down to whatever
 comes next.
 
@@ -20,8 +21,9 @@ Every day of the year is rendered ahead of time. Your phone resolves today's dat
 locally and fetches that file, and so does your Mac:
 
 ```
-https://<user>.github.io/annum/w/<slug>/2026-09-22.png           iPhone, 1290×2796
-https://<user>.github.io/annum/w/<slug>/desktop/2026-09-22.png   MacBook Pro 14″, 3024×1964
+https://<user>.github.io/annum/w/<slug>/2026-09-22.png             iPhone, 1290×2796
+https://<user>.github.io/annum/w/<slug>/desktop/2026-09-22.png     MacBook Pro 14″, 3024×1964
+https://<user>.github.io/annum/w/<slug>/ultrawide/2026-09-22.png   32:10 ultrawide, 3840×1200
 ```
 
 This is why there is no scheduled workflow. Nothing needs to keep a "current"
@@ -136,7 +138,10 @@ conversation — "add the marathon on 1 November" is enough.
 
    It checks today's image exists, then installs a LaunchAgent that sets the
    desktop picture on login and every hour after. A Mac asleep at midnight
-   catches up when it wakes. It sets the picture through NSWorkspace rather than
+   catches up when it wakes. Each display gets the render of its shape: an
+   ultrawide screen (wider than 2.2:1, like the ASUS XG43VQ) gets the 3840×1200
+   one, and every other screen the MacBook's. A display plugged in between runs
+   picks up its picture at the next one. It sets the picture through NSWorkspace rather than
    System Events, so there is no permission prompt — only the usual *Background
    Items Added* notice. macOS only changes the Space in front of each display,
    so other Spaces update when they're in front for a run. The log is
@@ -169,12 +174,13 @@ clears the widget stack on an iPhone 14 Pro Max; shift it if your lock screen is
 laid out differently. `markerScale` sizes milestone markers relative to the dot
 pitch.
 
-`desktop` takes the same `layout` and `footer` keys for the Mac wallpaper, in its
-own pixels. Only the look carries over from the top level — `shape`,
-`markerScale`, `dotRatio`, `showYear`, `maxMilestones` — because a phone's `top`
-of 1180 is most of the way down a laptop screen. The defaults put the grid below the menu
-bar, the notch and the lock screen clock, and stop the milestone list, split into
-three columns, above the Dock. Set `"desktop": false` to render only the phone.
+`desktop` and `ultrawide` take the same `layout` and `footer` keys for the Mac
+wallpapers, each in its own pixels. Only the look carries over from the top
+level — `shape`, `markerScale`, `dotRatio`, `showYear`, `maxMilestones` — because
+a phone's `top` of 1180 is most of the way down a laptop screen. The defaults put
+the grid below the menu bar, the notch and the lock screen clock, and stop the
+milestone list, split into columns, above the Dock. Set `"desktop": false` or
+`"ultrawide": false` to skip rendering one.
 
 Below the grid the year countdown comes first and carries the most weight, so a
 milestone number can never be misread as days left in the year. Beneath it every

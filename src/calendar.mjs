@@ -51,6 +51,11 @@ export const DEVICES = {
     layout: { width: 3024, height: 1964, marginX: 256, top: 620, scale: 1.6 },
     footer: { gap: 188, safeBottom: 260, columns: 3 },
   },
+  // 43" 32:10 super-ultrawide (ASUS ROG Strix XG43VQ) at its native 3840x1200.
+  ultrawide: {
+    layout: { width: 3840, height: 1200, marginX: 720, top: 300, scale: 1.1 },
+    footer: { gap: 130, safeBottom: 110, columns: 4 },
+  },
 }
 
 // Settings that describe the look rather than the screen, so every device
