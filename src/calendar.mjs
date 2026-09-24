@@ -44,20 +44,33 @@ export const DEVICES = {
       columns: 1,
     },
   },
-  // MacBook Pro 14" at its native 3024x1964. The grid starts below the menu
-  // bar, the notch and the lock screen clock; the list stops above the Dock;
-  // the side margins leave the first column of desktop icons alone.
+  // The desktops sit in a picture framer's mat: side and top margins about
+  // equal, the bottom a quarter larger so the block doesn't look to be
+  // sliding down (framers weight the bottom 8-25%). That puts its centre just
+  // above the middle, where the eye reads it as centred. `safeTop` keeps the
+  // month labels below the lock screen clock, 263pt down on both screens.
+  //
+  // MacBook Pro 14" at its native 3024x1964, at 2x. Equal top and sides under
+  // the clock's limit make the block two thirds of the width, with a whole
+  // 38px dot pitch; the right margin clears the first column of desktop icons.
   desktop: {
-    layout: { width: 3024, height: 1964, marginX: 256, top: 620, scale: 1.6 },
-    footer: { gap: 188, safeBottom: 260, columns: 3 },
+    layout: {
+      width: 3024, height: 1964, marginX: 505, scale: 1.3,
+      top: 'auto', balance: 1.25, safeTop: 526, corners: 2,
+    },
+    footer: { gap: 153, safeBottom: 260, columns: 3 },
   },
   // 43" 32:10 super-ultrawide (ASUS ROG Strix XG43VQ) at its native 3840x1200,
   // which macOS drives at 1x. The MacBook's proportions, with type a little
   // larger than a pure angular match because 1x has half the pixels per glyph.
-  // The margins make the dot pitch a whole 32px, so every dot draws alike; the
-  // month labels clear the lock screen clock by the same 263pt as the laptop's.
+  // The margins make the dot pitch a whole 32px, so every dot draws alike. The
+  // screen is too short for the mat's bottom weighting with a full list, so
+  // the clock's limit holds the block there; shorter lists centre properly.
   ultrawide: {
-    layout: { width: 3840, height: 1200, marginX: 1072, top: 333, scale: 1.1 },
+    layout: {
+      width: 3840, height: 1200, marginX: 1072, scale: 1.1,
+      top: 'auto', balance: 1.25, safeTop: 268, corners: 1,
+    },
     footer: { gap: 112, safeBottom: 130, columns: 3 },
   },
 }
@@ -174,18 +187,21 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   const x0 = (W - gridW) / 2 + pitch / 2
   const gridH = 7 * pitch
 
-  // `top: 'auto'` places the whole block, from the month labels' cap tops to
-  // the last list row, so the space below it is `balance` times the space
-  // above, and never starts above `safeTop`. The list holds every milestone in
-  // the year, so the block keeps its height, and its place, all year.
+  // The block runs from the month labels' cap tops, this far above the grid
+  // (JetBrains Mono's caps are 0.73em tall), to the last list row.
+  const above = px(46) + px(17) * 0.73
+
+  // `top: 'auto'` places the whole block so the space below it is `balance`
+  // times the space above, and never starts above `safeTop`. The list holds
+  // every milestone in the year, so the block keeps its height, and its place,
+  // all year.
   const autoTop = () => {
-    const above = px(46) + px(17) * 0.73 // JetBrains Mono's caps are 0.73em tall
     const rows = Math.ceil(Math.min(all.length, footer.maxMilestones) / listCols)
     const yearLine = gridH + px(74)
     const listFrom = footer.showYear ? yearLine + footer.gap : yearLine
     const lastDot = gridH - pitch / 2 + r
     const below = rows ? listFrom + (rows - 1) * px(46) : footer.showYear ? yearLine : lastDot
-    const space = (H - above - below) / (1 + layout.balance)
+    const space = (H - above - below) / (1 + (layout.balance ?? 1))
     return Math.round(Math.max(layout.safeTop ?? 0, space) + above)
   }
   const y0 = layout.top === 'auto' ? autoTop() : layout.top
@@ -242,6 +258,8 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
 
   const daysTo = (m) => Math.round((utc(m.date) - today) / DAY)
   let y = y0 + gridH + px(74)
+  // The block's lowest baseline so far, for the corner marks.
+  let bottom = y0 + gridH - pitch / 2 + r
 
   // The year countdown sits directly under the grid and carries the most
   // weight, so a milestone's number can never be mistaken for it.
@@ -264,6 +282,7 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
     out.push(
       `<text x="${right.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="${px(24)}" letter-spacing="${px(3)}" fill="${THEME.dim}" text-anchor="end">IN ${year} · ${pct}%</text>`
     )
+    bottom = y
     y += footer.gap
   }
 
@@ -315,8 +334,23 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
           `<text x="${LABEL_LEFT.toFixed(1)}" y="${row}" font-family="JetBrains Mono" font-weight="500" font-size="${px(24)}" letter-spacing="${px(3)}" fill="${tone}" opacity="${past ? 0.75 : 1}">${esc(clip(lbl.toUpperCase(), labelWidth))}</text>`
         )
       }
+      bottom = Math.max(bottom, row)
       row += ROW
     }
+  }
+
+  // Corner marks: a mat implied only by its corners, one pitch outside the
+  // block and one pitch long, `corners` px wide and in a future day's grey.
+  // Snapped to the pixel grid so a 1px or 2px line stays crisp.
+  if (layout.corners > 0) {
+    const w = layout.corners
+    const snap = (v) => (w % 2 ? Math.round(v - 0.5) + 0.5 : Math.round(v))
+    const [x1, x2] = [snap(left - pitch), snap(right + pitch)]
+    const [y1, y2] = [snap(y0 - above - pitch), snap(bottom + pitch)]
+    const [ax1, ax2, ay1, ay2] = [snap(x1 + pitch), snap(x2 - pitch), snap(y1 + pitch), snap(y2 - pitch)]
+    out.push(
+      `<path d="M${x1} ${ay1}V${y1}H${ax1}M${ax2} ${y1}H${x2}V${ay1}M${x2} ${ay2}V${y2}H${ax2}M${ax1} ${y2}H${x1}V${ay2}" fill="none" stroke="${THEME.future}" stroke-width="${w}"/>`
+    )
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${out.join('')}</svg>`

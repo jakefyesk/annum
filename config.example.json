@@ -50,7 +50,8 @@
   },
   "desktop": {
     "layout": {
-      "top": 620
+      "top": "auto",
+      "balance": 1.25
     },
     "footer": {
       "columns": 3,

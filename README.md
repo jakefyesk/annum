@@ -156,7 +156,7 @@ conversation — "add the marathon on 1 November" is enough.
   "layout": { "top": 1180, "shape": "circle", "markerScale": 1.2 },
   "footer": { "showYear": true, "maxMilestones": 12 },
   "desktop": {
-    "layout": { "top": 620 },
+    "layout": { "top": "auto", "balance": 1.25, "corners": 2 },
     "footer": { "columns": 3, "safeBottom": 260 }
   },
   "milestones": [
@@ -181,6 +181,14 @@ a phone's `top` of 1180 is most of the way down a laptop screen. The defaults pu
 the grid below the menu bar, the notch and the lock screen clock, and stop the
 milestone list, split into columns, above the Dock. Set `"desktop": false` or
 `"ultrawide": false` to skip rendering one.
+
+Both desktops centre themselves the way a picture framer cuts a mat. With
+`"top": "auto"`, margins at the top and sides are about equal and the bottom one
+is `balance` (1.25) times the top, so the block's centre sits just above the
+middle, where it reads as centred rather than sagging. It never rises above
+`safeTop`, the lock screen clock's limit. A number instead puts the grid's top
+row at that pixel. `corners` draws faint corner marks one dot-pitch outside the
+block, that many pixels wide; `0` turns them off.
 
 Below the grid the year countdown comes first and carries the most weight, so a
 milestone number can never be misread as days left in the year. Beneath it every
