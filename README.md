@@ -137,8 +137,9 @@ conversation — "add the marathon on 1 November" is enough.
    ```
 
    It checks today's image exists, then installs a LaunchAgent that checks
-   every screen on login and once a minute after, and changes only the ones
-   showing the wrong picture. A Mac asleep at midnight catches up when it
+   every screen on login, whenever a display is plugged in or unplugged, and
+   once a minute as a backstop, and changes only the ones showing the wrong
+   picture. A Mac asleep at midnight catches up when it
    wakes. Each display gets the render of its shape: an ultrawide screen (wider
    than 2.2:1, like the ASUS XG43VQ) gets the 3840×1200 one, and every other
    screen, the MacBook's own included, gets the MacBook's. Unplugging a display
@@ -189,12 +190,12 @@ Both desktops centre themselves the way a picture framer cuts a mat. With
 `"top": "auto"`, the space below the block is `balance` (1.25) times the space
 above it, so its centre sits just above the middle, where it reads as centred
 rather than sagging. It never starts higher than `safeTop`, the lock screen
-clock's limit, and never so low that the list loses a row. On the MacBook the
-width is chosen so that a full list comes out with top and side margins about
-equal, as a mat's are; the ultrawide is too short for that, so a full list
-there sits at `safeTop`. A number instead puts the grid's top row at that
-pixel. `corners` draws faint corner marks one dot-pitch outside the block, that
-many pixels wide; `0` turns them off.
+clock's limit, and never so low that the list loses a row. Both blocks are
+kept small and quiet, dots and type shrinking together down to the smallest
+type that still reads, so the negative space around them does the framing.
+A number instead puts the grid's top row at that pixel. `corners` draws faint
+corner marks one dot-pitch outside the block, that many pixels wide; `0` turns
+them off.
 
 A config made on the site or from the example before centring arrived pins
 `desktop.layout.top` to 620 (and `ultrawide.layout.top` to 333), which turns

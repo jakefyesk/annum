@@ -22,7 +22,8 @@ LOG="$HOME/Library/Logs/annum.log"
 # alone. Unplugging a display can hand its picture to the one that's left, and
 # comparing first means a run a minute catches that without resetting every
 # screen each time. It prints "fetch" if an ultrawide screen is waiting on an
-# image that isn't downloaded yet; that screen gets the MacBook one meanwhile.
+# image that isn't downloaded yet (that screen gets the MacBook one
+# meanwhile), and "changed" if it set anything.
 # NSWorkspace rather than System Events: no Apple Events means no automation
 # prompt, which a LaunchAgent has no window to show.
 screens() {
@@ -32,20 +33,22 @@ screens() {
     function run(argv) {
       const ws = $.NSWorkspace.sharedWorkspace
       const has = (p) => $.NSFileManager.defaultManager.fileExistsAtPath(p)
+      const norm = (u) => ObjC.unwrap(u.URLByStandardizingPath.path) || ""
       const screens = $.NSScreen.screens
-      let waiting = false
+      let waiting = false, changed = false
       for (let i = 0; i < screens.count; i++) {
         const s = screens.objectAtIndex(i)
         if (wide(s) && !has(argv[1])) waiting = true
         const path = wide(s) && has(argv[1]) ? argv[1] : argv[0]
         let shown = ""
-        try { shown = ObjC.unwrap(ws.desktopImageURLForScreen(s).path) || "" } catch (e) {}
-        if (shown === path) continue
+        try { shown = norm(ws.desktopImageURLForScreen(s)) } catch (e) {}
+        if (shown === norm($.NSURL.fileURLWithPath(path))) continue
         const ok = ws.setDesktopImageURLForScreenOptionsError(
           $.NSURL.fileURLWithPath(path), s, $.NSDictionary.dictionary, null)
         if (!ok) throw new Error("macOS refused the desktop picture")
+        changed = true
       }
-      return waiting ? "fetch" : ""
+      return [waiting ? "fetch" : "", changed ? "changed" : ""].join(" ").trim()
     }' "$@"
 }
 
@@ -84,10 +87,18 @@ cmd_run() {
   # The ultrawide render is fetched only once such a screen is connected. If
   # it can't be — not deployed yet, or "ultrawide": false — that screen keeps
   # the MacBook picture.
-  if [ "$(screens "$desk" "$wide")" = fetch ] &&
-    fetch "${base%/desktop}/ultrawide/$today.png" "$wide"; then
-    screens "$desk" "$wide" >/dev/null
-  fi
+  result=$(screens "$desk" "$wide")
+  case $result in *fetch*)
+    fetch "${base%/desktop}/ultrawide/$today.png" "$wide" &&
+      result="$result $(screens "$desk" "$wide")" ;;
+  esac
+  # macOS's wallpaper agent has been seen applying a stale cached picture
+  # just after a new one is set, and a display that has just been plugged in
+  # can still be settling, so look again shortly after changing anything.
+  case $result in *changed*)
+    sleep 5
+    screens "$desk" "$wide" >/dev/null ;;
+  esac
 
   # Keep a week. Spaces that weren't in front during a run still point at an
   # older file, and a deleted one turns into the default wallpaper on login.
@@ -128,10 +139,12 @@ cmd_install() {
   # Run from a copy, so the agent survives the download or clone being deleted.
   [ "$0" -ef "$DIR/annum.sh" ] || cp "$0" "$DIR/annum.sh"
 
-  # On login, then every minute, so a display plugged in or unplugged gets its
-  # picture within one. launchd runs a missed interval once on wake, so a
-  # laptop that slept through midnight catches up when it's opened. A run
-  # with nothing to do is one osascript that changes nothing.
+  # On login, whenever macOS rewrites its display arrangement (as it does
+  # when a display is plugged in or unplugged), and every minute, since Apple
+  # calls watching a path race-prone. Intervals missed while asleep aren't
+  # made up, but the next comes within a minute of waking, so a laptop that
+  # slept through midnight catches up when it's opened. A run with nothing to
+  # do is one osascript that changes nothing, at background priority.
   cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -147,6 +160,9 @@ cmd_install() {
   </array>
   <key>RunAtLoad</key><true/>
   <key>StartInterval</key><integer>60</integer>
+  <key>WatchPaths</key>
+  <array><string>/Library/Preferences/com.apple.windowserver.displays.plist</string></array>
+  <key>ProcessType</key><string>Background</string>
   <key>StandardOutPath</key><string>$LOG</string>
   <key>StandardErrorPath</key><string>$LOG</string>
 </dict>

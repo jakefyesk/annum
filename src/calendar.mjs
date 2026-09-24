@@ -48,32 +48,32 @@ export const DEVICES = {
   // larger than the top, so the block doesn't look to be sliding down
   // (framers weight the bottom 8-25%). That puts its centre just above the
   // middle, where the eye reads it as centred. `safeTop` keeps the month
-  // labels below the lock screen clock.
+  // labels below the lock screen clock; the block now sits well clear of it.
   //
-  // MacBook Pro 14" at its native 3024x1964, at 2x. Its width is chosen so a
-  // full list comes out with top and side margins about equal, as a mat's
-  // are, under the clock's 263pt: two thirds of the screen, a whole 38px dot
-  // pitch, and a right margin that clears the first column of desktop icons.
+  // Both are small and quiet: dots and type shrink together, keeping the
+  // pitch-to-type ratio that makes this the same design, down to the smallest
+  // type that still reads (list labels at 10pt on the MacBook, month labels
+  // near 13px at 1x) and 20-character labels. Each margin makes the dot pitch
+  // a whole number of pixels, so every dot draws alike.
+  //
+  // MacBook Pro 14" at its native 3024x1964, at 2x: a 25px pitch, the block
+  // about two fifths of the width and a quarter of the height.
   desktop: {
     layout: {
-      width: 3024, height: 1964, marginX: 505, scale: 1.3,
+      width: 3024, height: 1964, marginX: 849.5, scale: 0.86,
       top: 'auto', balance: 1.25, safeTop: 526, corners: 2,
     },
-    footer: { gap: 153, safeBottom: 260, columns: 3 },
+    footer: { gap: 101, safeBottom: 260, columns: 3 },
   },
   // 43" 32:10 super-ultrawide (ASUS ROG Strix XG43VQ) at its native 3840x1200,
-  // which macOS drives at 1x. The MacBook's proportions, with type a little
-  // larger than a pure angular match because 1x has half the pixels per glyph.
-  // The margins make the dot pitch a whole 32px, so every dot draws alike. The
-  // screen is too short for the mat's bottom weighting with a full list, so
-  // safeTop holds the block at 268pt, where it already sat; shorter lists
-  // centre properly.
+  // which macOS drives at 1x: a 22px pitch. Its type stays a little larger
+  // than the MacBook's by angle, since 1x has half the pixels per glyph.
   ultrawide: {
     layout: {
-      width: 3840, height: 1200, marginX: 1072, scale: 1.1,
+      width: 3840, height: 1200, marginX: 1337, scale: 0.76,
       top: 'auto', balance: 1.25, safeTop: 268, corners: 1,
     },
-    footer: { gap: 112, safeBottom: 130, columns: 3 },
+    footer: { gap: 89, safeBottom: 130, columns: 3 },
   },
 }
 
