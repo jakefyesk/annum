@@ -139,7 +139,10 @@ conversation — "add the marathon on 1 November" is enough.
    It checks today's image exists, then installs a LaunchAgent that checks
    every screen on login, whenever a display is plugged in or unplugged, and
    once a minute as a backstop, and changes only the ones showing the wrong
-   picture. A Mac asleep at midnight catches up when it
+   picture. Each run also asks Pages whether today's image has changed since
+   the Mac downloaded it, and the answer carries no image unless it has. So a
+   config change or a new render reaches the screen about a minute after the
+   deploy goes live. A Mac asleep at midnight catches up when it
    wakes. Each display gets the render of its shape: an ultrawide screen (wider
    than 2.2:1, like the ASUS XG43VQ) gets the 3840×1200 one, and every other
    screen, the MacBook's own included, gets the MacBook's. Unplugging a display
