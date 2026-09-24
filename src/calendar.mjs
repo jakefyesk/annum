@@ -52,9 +52,9 @@ export const DEVICES = {
   //
   // Both are small and quiet: dots and type shrink together, keeping the
   // pitch-to-type ratio that makes this the same design, down to the smallest
-  // type that still reads (list labels at 10pt on the MacBook, month labels
-  // near 13px at 1x) and 20-character labels. Each margin makes the dot pitch
-  // a whole number of pixels, so every dot draws alike.
+  // type that still reads on the MacBook (list labels at 10pt) and
+  // 20-character labels. Each margin makes the dot pitch a whole number of
+  // pixels, so every dot draws alike.
   //
   // MacBook Pro 14" at its native 3024x1964, at 2x: a 25px pitch, the block
   // about two fifths of the width and a quarter of the height.
@@ -66,14 +66,20 @@ export const DEVICES = {
     footer: { gap: 101, safeBottom: 260, columns: 3 },
   },
   // 43" 32:10 super-ultrawide (ASUS ROG Strix XG43VQ) at its native 3840x1200,
-  // which macOS drives at 1x: a 22px pitch. Its type stays a little larger
-  // than the MacBook's by angle, since 1x has half the pixels per glyph.
+  // which macOS drives at 1x: a 15px pitch, so the block looks the MacBook's
+  // size from where each is seen, about 90cm and 55cm. Both screens stand
+  // about 20 degrees tall from there, and the block takes the same angle and
+  // the same share of the height on each. Matching its share of the width
+  // isn't the same thing on a screen this wide, whose sides are out in
+  // peripheral vision, and nor is matching area, which left the block half as
+  // big again. Month labels come out near 9px, the MacBook's size by angle; a
+  // pixel there is about an arcminute, so drawing them at 1x costs little.
   ultrawide: {
     layout: {
-      width: 3840, height: 1200, marginX: 1337, scale: 0.76,
+      width: 3840, height: 1200, marginX: 1522.5, scale: 0.515,
       top: 'auto', balance: 1.25, safeTop: 268, corners: 1,
     },
-    footer: { gap: 89, safeBottom: 130, columns: 3 },
+    footer: { gap: 61, safeBottom: 130, columns: 3 },
   },
 }
 
@@ -362,7 +368,10 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   if (w > 0) {
     const len = Math.round(pitch) + Math.floor(w / 2)
     const xl = Math.round(left - pitch) - Math.floor(w / 2)
-    const xr = Math.round(right + pitch) - Math.ceil(w / 2)
+    // The block is always centred, so the right marks mirror the left ones;
+    // rounding each side on its own shifts one a pixel when the block's edges
+    // fall on half pixels, as an odd grid width puts them.
+    const xr = W - xl - w
     const yt = Math.round(y0 - above - pitch) - Math.floor(w / 2)
     const yb = Math.round(bottom + pitch) - Math.ceil(w / 2)
     if (xl >= 0 && xr + w <= W && yt >= 0 && yb + w <= H) {
