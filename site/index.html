@@ -147,6 +147,26 @@
     </section>
 
     <section>
+      <h2>Life</h2>
+      <div class="body">
+        <table>
+          <tr><td style="color:var(--dim)">Birthday</td><td>
+            <input id="birthday" type="date" autocomplete="off">
+          </td></tr>
+          <tr><td style="color:var(--dim)">Life expectancy</td><td>
+            <input id="lifeExpectancy" type="number" value="75" min="1" max="150" step="1" placeholder="75" autocomplete="off" style="width:90px"> years
+          </td></tr>
+        </table>
+        <p class="note">
+          A birthday adds a row over the grid, a dot for each year of a life. The date is
+          never drawn, but <strong>your age</strong> and <strong>the share of your life</strong>
+          are, and every day's image sits at a predictable URL beside today's, so anyone with
+          the URL can find <strong>your birthday</strong>: it's the day the row's red dot moves.
+        </p>
+      </div>
+    </section>
+
+    <section>
       <h2>ANNUM_CONFIG</h2>
       <div class="body">
         <textarea id="b64" readonly spellcheck="false"></textarea>
@@ -215,6 +235,10 @@ async function loadSprite(ch) {
 
 function draw() {
   // The preview renders the exact config it hands you, so the two can't disagree.
+  // Typing isn't held to a field's min, max or step, so a value its field
+  // marks invalid counts as unset, as events.mjs would refuse it.
+  const birthday = $('#birthday').validity.valid ? $('#birthday').value : ''
+  const expectancy = $('#lifeExpectancy').validity.valid ? Number($('#lifeExpectancy').value) : 0
   const json = { _example: false, years: [new Date().getUTCFullYear(), new Date().getUTCFullYear() + 1],
                  layout: { top: state.top.phone, shape: $('#shape').value },
                  // Only offsets you've changed, so the config doesn't pin a preset
@@ -223,7 +247,11 @@ function draw() {
                    .filter((id) => id !== 'phone' && state.top[id] !== DEVICES[id].layout.top)
                    .map((id) => [id, { layout: { top: state.top[id] } }])),
                  milestones: state.milestones.filter((m) => m.date),
-                 ranges: state.ranges.filter((r) => r.start && r.end) }
+                 ranges: state.ranges.filter((r) => r.start && r.end),
+                 // Only what you've set; 75 is the renderer's own default. Last,
+                 // so the birthday isn't among the first bytes of the config.
+                 ...(birthday ? { birthday } : {}),
+                 ...(expectancy && expectancy !== 75 ? { lifeExpectancy: expectancy } : {}) }
   const device = $('#device').value
   $('#preview').innerHTML = renderSVG({ todayStr: $('#today').value || todayISO, config: json, device, sprites })
   $('#b64').value = btoa(unescape(encodeURIComponent(JSON.stringify(json))))
@@ -290,10 +318,12 @@ const showTop = () => {
   $('#top').placeholder = String(DEVICES[device].layout.top)
   $('#top').value = typeof state.top[device] === 'number' ? state.top[device] : ''
 }
-// Where auto put the grid: the January tick, the preview's first future-grey
-// rect, sits px(34) above it.
+// The number that puts the block where auto did. A number fixes the block's
+// first baseline px(46) above it: the month labels', or with a birthday the
+// life caption's, whose band then pushes the grid down. So it's read from that
+// baseline, the preview's first text, not from the grid.
 const autoTop = (device) =>
-  +$('#preview svg rect[fill="#333333"]').getAttribute('y') + Math.round(34 * DEVICES[device].layout.scale * 10) / 10
+  Math.round(+$('#preview svg text').getAttribute('y') + Math.round(46 * DEVICES[device].layout.scale * 10) / 10)
 $('#device').oninput = () => { showTop(); draw() }
 $('#top').oninput = () => {
   const device = $('#device').value
@@ -306,9 +336,12 @@ $('#top').oninput = () => {
 }
 // Once editing ends, show the offset actually in use, not a cleared or 0 field.
 $('#top').onchange = showTop
-for (const id of ['#shape', '#today']) $(id).oninput = draw
+for (const id of ['#shape', '#today', '#birthday', '#lifeExpectancy']) $(id).oninput = draw
+// Cleared, it means 75 again; show it, so a step starts there and not from 0.
+$('#lifeExpectancy').onchange = () => { if ($('#lifeExpectancy').value === '') $('#lifeExpectancy').value = 75 }
 
 $('#today').value = todayISO
+$('#birthday').max = todayISO
 showTop()
 rowsM(); rowsR()
 state.milestones.forEach((m) => loadSprite(m.emoji))

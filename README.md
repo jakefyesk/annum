@@ -7,7 +7,8 @@ ultrawide monitor — that renders the current year as a horizontal dot grid: se
 rows tall, read left to right, so it scans like a progress bar rather than a
 calendar. Significant dates become
 emoji markers, date ranges tint their dots, and the footer counts down to whatever
-comes next.
+comes next. A birthday adds one more row above the grid, which does for a life
+what the grid does for the year: a dot for each of 75 years.
 
 Everything runs on GitHub: Actions renders the images, Pages serves them, an iOS
 Shortcut sets one as your phone's wallpaper each morning, and a LaunchAgent does
@@ -41,7 +42,9 @@ Worth being precise about, because the obvious framing is wrong. **Almost
 everything in the config is already visible in the wallpaper** — dates, emoji,
 visible labels, which weeks are tinted. The PNG is served unauthenticated. The
 only things the config holds that the image doesn't are the true labels of
-`private: true` milestones and range labels, which are never drawn.
+`private: true` milestones and range labels, which are never drawn, and a
+birthday, which it shows as your age and the share of a life lived (but see
+below).
 
 So the thing worth protecting isn't the *content*, it's **discoverability**:
 
@@ -78,6 +81,14 @@ For label-level control, `"private": true` on a milestone keeps its marker and
 countdown but drops the words from the image; `"redactLabels": true` does that
 globally.
 
+A `birthday` is never drawn as a date, but each image shows your age and the
+share of the life lived, which together place it within about nine months at 75
+years (less for a shorter life). And every day is rendered ahead of time at a
+predictable URL beside today's, so anyone with the URL can find the birthday
+itself: it is the day the life row's red dot moves. On a screen other people
+see, like a desktop at work, `"life": false` in that device's `layout` leaves
+the row off.
+
 Three checks keep the config out of git history, where no slug would help:
 
 | Check | Where | Catches |
@@ -100,6 +111,8 @@ node scripts/events.mjs add 2026-11-01 "NYC Marathon" 🗽
 node scripts/events.mjs add 2026-07-04 "Something" --private
 node scripts/events.mjs rm "NYC Marathon"
 node scripts/events.mjs range 2026-12-20 2026-12-31
+node scripts/events.mjs birthday 1990-05-12
+node scripts/events.mjs birthday off
 node scripts/events.mjs deploy
 ```
 
@@ -107,6 +120,10 @@ Each command reads the current variable, edits it, writes it back, and mirrors
 the result into a gitignored local `config.json`. `pull` and `push` move between
 the two by hand. Because the variable reads back, this is all editable in
 conversation — "add the marathon on 1 November" is enough.
+
+`birthday` refuses a date that doesn't exist or hasn't come yet. A life
+expectancy in years can follow the date (`birthday 1990-05-12 80`); without
+one, whatever is set stays. `birthday off` removes both.
 
 ## Setup
 
@@ -160,6 +177,8 @@ conversation — "add the marathon on 1 November" is enough.
 {
   "years": [2026, 2027],
   "redactLabels": false,
+  "birthday": "1990-05-12",
+  "lifeExpectancy": 75,
   "layout": { "top": 1180, "shape": "circle", "markerScale": 1.2 },
   "footer": { "showYear": true, "maxMilestones": 12 },
   "desktop": {
@@ -176,10 +195,11 @@ conversation — "add the marathon on 1 November" is enough.
 }
 ```
 
-`layout.top` is the vertical offset of the grid in pixels. The default of 1180
-clears the widget stack on an iPhone 14 Pro Max; shift it if your lock screen is
-laid out differently. `markerScale` sizes milestone markers relative to the dot
-pitch.
+`layout.top` is the vertical offset of the grid in pixels; a birthday's row
+pushes the grid a band lower, so the block's top edge stays put (see below).
+The default of 1180 clears the widget stack on an iPhone 14 Pro Max; shift it
+if your lock screen is laid out differently. `markerScale` sizes milestone
+markers relative to the dot pitch.
 
 `desktop` and `ultrawide` take the same `layout` and `footer` keys for the Mac
 wallpapers, each in its own pixels. Only the look carries over from the top
@@ -194,9 +214,10 @@ Both desktops centre themselves the way a picture framer cuts a mat. With
 above it, so its centre sits just above the middle, where it reads as centred
 rather than sagging. It never starts higher than `safeTop`, the lock screen
 clock's limit, and never so low that the list loses a row. A number instead
-puts the grid's top row at that pixel. Both blocks are kept small and quiet,
-dots and type shrinking together down to the smallest type that still reads,
-so the negative space around them does the framing. The ultrawide's is sized
+puts the grid's top row at that pixel, or a band lower with a birthday. Both
+blocks are kept small and quiet, dots and type shrinking together down to the
+smallest type that still reads, so the negative space around them does the
+framing. The ultrawide's is sized
 to look like the MacBook's from where each is usually seen — the same visual
 angle, and the same share of the screen's height — rather than to fill as
 much of a screen whose sides are out in peripheral vision. `corners` draws
@@ -207,6 +228,26 @@ A config made on the site or from the example before centring arrived pins
 `desktop.layout.top` to 620 (and `ultrawide.layout.top` to 333), which turns
 it off. `node scripts/events.mjs pull`, delete those keys from `config.json`,
 then `push`.
+
+`birthday` adds a row of dots above the month labels, one for each year of a
+life of `lifeExpectancy` years (rounded, 1 to 150; 75 otherwise), in the
+grid's colours: years lived white, the current one red, the rest grey. The dots
+are grouped by decade, so the age can be counted at a glance. At 75 the row
+spans the grid's dots on every screen, so a year and a life read at the same
+length; some other lengths would have to open the gaps between decades by more
+than a dot-pitch to do that, and stop a little short instead, centred. Over the
+row are your age and the share of the life lived so far, whose percentage ends
+above the year's. Past the last dot the row stays white and the percentage
+keeps counting.
+
+The row and its caption take a band above the month labels. With a numeric
+`top` the block's top edge stays where it was — on the phone, clear of the
+clock and widgets — and the band pushes the grid and everything under it down,
+so the list has less room above `safeBottom`: on the phone, two rows less (18
+rather than 20 at the default `top`). With `"top": "auto"` the band is part of
+the block that gets centred. `"life": false` in a device's `layout` leaves the
+row off that screen; like `top`, it isn't shared, because the top-level
+`layout` is the phone's own. See Privacy before adding a birthday.
 
 Below the grid the year countdown comes first and carries the most weight, so a
 milestone number can never be misread as days left in the year. Beneath it every

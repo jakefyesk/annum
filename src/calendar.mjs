@@ -47,8 +47,9 @@ export const DEVICES = {
   // The desktops sit in a picture framer's mat: the bottom margin a quarter
   // larger than the top, so the block doesn't look to be sliding down
   // (framers weight the bottom 8-25%). That puts its centre just above the
-  // middle, where the eye reads it as centred. `safeTop` keeps the month
-  // labels below the lock screen clock; the block now sits well clear of it.
+  // middle, where the eye reads it as centred. `safeTop` keeps the block's top
+  // edge (the month labels, or with a birthday the life caption) below the
+  // lock screen clock; the block now sits well clear of it.
   //
   // Both are small and quiet: dots and type shrink together, keeping the
   // pitch-to-type ratio that makes this the same design, down to the smallest
@@ -119,6 +120,27 @@ function buildYear(year, today) {
     d.state = d.t < today ? 'past' : d.t === today ? 'today' : 'future'
   })
   return days
+}
+
+// Where `today` falls in a life of `lifeExpectancy` years (rounded, 1 to 150;
+// 75 otherwise), or null without a real birthday or before it. A 29 February
+// birthday comes on 1 March in other years, as setUTCFullYear rolls it over,
+// both for the age and for the birthday that ends the life. (Date.UTC would
+// read years 0-99 as 1900-1999.) The share of the life lived is in whole
+// percent, multiplied before dividing, so an exact share such as 58% isn't
+// floored to 57%.
+function lifeOf(config, today) {
+  const b = config.birthday
+  const born = typeof b === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b) ? utc(b) : NaN
+  // Date.parse takes 30 February as 2 March, so only a round trip proves a date.
+  if (!Number.isFinite(born) || iso(born) !== b || today < born) return null
+  const asked = Math.round(Number(config.lifeExpectancy ?? 75))
+  const years = asked >= 1 && asked <= 150 ? asked : 75
+  const by = new Date(born).getUTCFullYear()
+  const birthday = (y) => new Date(born).setUTCFullYear(y)
+  const ty = new Date(today).getUTCFullYear()
+  const age = ty - by - (today < birthday(ty) ? 1 : 0)
+  return { years, age, percent: Math.floor((100 * (today - born)) / (birthday(by + years) - born)) }
 }
 
 // A milestone's label is drawn as literal text in the wallpaper, which is served
@@ -195,9 +217,51 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   const x0 = (W - gridW) / 2 + pitch / 2
   const gridH = 7 * pitch
 
+  // With a birthday, a life drawn the way the grid draws a year: a row of dots,
+  // one a year, over the month labels. It spans the grid's dots edge to edge,
+  // so the two bars read at the same length, a year and a life. Within a decade
+  // the pitch is whole pixels and each dot's box starts on one, so every dot
+  // draws alike; the rest of the width goes to the gaps between decades, which
+  // is what makes 36 countable at a glance. `life: false` in a device's layout
+  // leaves it off that screen.
+  const life = layout.life === false ? null : lifeOf(config, today)
+  let lifeRow
+  if (life) {
+    const n = life.years
+    const ratio = Number(layout.dotRatio)
+    const gaps = Math.ceil(n / 10) - 1
+    const xl = Math.round(x0 - r)
+    const span = W - 2 * xl
+    // No more than 0.8 of the grid's pitch, so a shorter life can't outweigh
+    // the year.
+    const most = Math.max(2, Math.floor(pitch * 0.8))
+    // The widest pitch that still leaves every decade gap at least 0.3 of one
+    // wider, the least that reads as a gap.
+    const fit = Math.floor(span / (n - 1 + ratio + gaps * 0.3))
+    const q = Math.max(2, Math.min(most, fit))
+    const d = Math.round(q * ratio)
+    // The gaps take the rest of the width, but no more than a pitch more each,
+    // or the row comes apart into decades. What they can't take, from a short
+    // life or from the pitch rounding down to whole pixels, becomes equal
+    // margins, so the row ends a little short of the grid but stays centred;
+    // an odd pixel goes to the gaps. 75 years spans every screen.
+    const free = span - d - (n - 1) * q
+    const inset = Math.floor(Math.max(0, free - gaps * q) / 2)
+    const spread = (k) => (gaps ? Math.round((k * (free - 2 * inset)) / gaps) : 0)
+    // The row's box is as tall as the largest dot any life could have here, so
+    // the band, and the grid under it, don't move with lifeExpectancy.
+    const box = Math.round(most * ratio)
+    lifeRow = { n, d, box, x: (i) => xl + inset + i * q + spread(Math.floor(i / 10)) }
+  }
+  // The band it adds over the month labels: the caption's caps, the row's box,
+  // and a gap to the labels wider than theirs to the grid, so they stay the
+  // grid's.
+  const band = life ? Math.round(px(17) * 0.73 + px(18) + lifeRow.box + px(52)) : 0
+
   // The block runs from the month labels' cap tops, this far above the grid
-  // (JetBrains Mono's caps are 0.73em tall), to the last list row.
-  const above = px(46) + px(17) * 0.73
+  // (JetBrains Mono's caps are 0.73em tall), or the life's caption's, a band
+  // above them, to the last list row.
+  const above = px(46) + px(17) * 0.73 + band
 
   // `top: 'auto'` places the whole block so the space below it is `balance`
   // times the space above, and never starts above `safeTop`. The list holds
@@ -218,11 +282,42 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
     const highest = Math.ceil(Number(layout.safeTop ?? 0) + above)
     return Math.max(highest, Math.min(Math.round(space + above), lowest))
   }
-  const y0 = layout.top === 'auto' ? autoTop() : layout.top
+  // A number puts the grid there, or with a birthday a band lower: on a phone
+  // it was chosen to keep the block under the clock and widgets, so the band
+  // pushes the grid down rather than the block up.
+  const y0 = layout.top === 'auto' ? autoTop() : band ? Number(layout.top) + band : layout.top
   const left = x0 - pitch / 2
   const right = x0 + gridW - pitch / 2
 
   const out = [`<rect width="${W}" height="${H}" fill="${THEME.bg}"/>`]
+
+  if (life) {
+    // The caption's caps are the block's top edge, exactly where the month
+    // labels' were; the row's whole-pixel rounding comes out of the gaps, and
+    // its dots sit centred in its box.
+    const base = y0 - band - px(46)
+    const { n, d, box, x } = lifeRow
+    const top = Math.round(base + px(18)) + Math.round((box - d) / 2)
+    const dot = (i) =>
+      layout.shape === 'square'
+        ? `<rect x="${x(i)}" y="${top}" width="${d}" height="${d}"/>`
+        : `<circle cx="${x(i) + d / 2}" cy="${top + d / 2}" r="${d / 2}"/>`
+    // One group per tone: the years lived, this one, and the rest.
+    const run = (fill, from, to) =>
+      from < to && out.push(`<g fill="${fill}">${Array.from({ length: to - from }, (_, k) => dot(from + k)).join('')}</g>`)
+    run(THEME.past, 0, Math.min(life.age, n))
+    run(THEME.today, life.age, Math.min(life.age + 1, n))
+    run(THEME.future, life.age + 1, n)
+    // The footer's pairing at life scale, in the month labels' type: the age
+    // on the left, and on the right the share of the life, its percentage over
+    // the year's. Floored, so 100% means the last dot is spent; past it, it
+    // keeps counting.
+    const type = `font-family="JetBrains Mono" font-weight="500" font-size="${px(17)}" letter-spacing="${px(1.5)}"`
+    out.push(`<text x="${left.toFixed(1)}" y="${base.toFixed(1)}" ${type} fill="${THEME.label}">AGE ${life.age}</text>`)
+    out.push(
+      `<text x="${right.toFixed(1)}" y="${base.toFixed(1)}" ${type} fill="${THEME.label}" text-anchor="end">OF ${n} YEAR${n > 1 ? 'S' : ''} · ${life.percent}%</text>`
+    )
+  }
 
   for (let m = 0; m < 12; m++) {
     const d = byDate.get(`${year}-${String(m + 1).padStart(2, '0')}-01`)
