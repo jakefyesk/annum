@@ -217,9 +217,8 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   // to edge with the grid in the grid's own rhythm, and a year and a life read
   // at the same length. The share lived is in the dim grey of the footer's
   // year and percentage, the rest in a future day's, and the dash where they
-  // meet is split between the two, so the one red mark stays the grid's today.
-  // Nothing is written on it. `life: false` in a device's layout leaves it off
-  // that screen.
+  // meet is split between the two rather than lit red. Nothing is written on
+  // it. `life: false` in a device's layout leaves it off that screen.
   const lived = layout.life === false ? null : lifeOf(config, today)
   // Whole pixels, the dots' width rounded, so the gaps between dashes are the
   // gaps between dots to within a pixel. Where every column is centred on a

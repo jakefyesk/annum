@@ -82,15 +82,16 @@ globally.
 
 A `birthday` is never drawn as a date, and the rule it adds carries no text, so
 no age or percentage is drawn either. But the rule shows the share of the life
-lived as a length, to within a few weeks: a pixel of it is about six weeks of a
-75-year life on the phone, five on the MacBook and seven or eight on the
-ultrawide (fewer for a shorter life). With the life's length, 75 unless you set
-another, that is your age. And every day is rendered ahead of time at a
-predictable URL beside today's, so anyone with the URL who knows how the rule
-is drawn — the code is public — can find the days it grows by a pixel and work
-back from them to the birthday, to the day, and to the life expectancy. On a
-screen other people see, like a desktop at work, `"life": false` in that
-device's `layout` leaves the rule off.
+lived as a length: a pixel of it is about six weeks of a 75-year life on the
+phone, five on the MacBook and seven or eight on the ultrawide (fewer for a
+shorter life), and it is never more than a pixel and a half out, so one image
+places you in your life to within a month or two, nearly three on the ultrawide.
+With the life's length, 75 unless you set another, that is your age. And every
+day is rendered ahead of time at a predictable URL beside today's, so anyone
+with the URL who knows how the rule is drawn — the code is public — can find the
+days it grows by a pixel and work back from them to the birthday, to the day,
+and to the life expectancy. On a screen other people see, like a desktop at
+work, `"life": false` in that device's `layout` leaves the rule off.
 
 Three checks keep the config out of git history, where no slug would help:
 
@@ -243,8 +244,7 @@ neither part is left under 3px, which would read as a stray pixel rather than
 as the rule changing tone: a part that would be thinner goes to nothing or to
 3px, whichever is nearer. It doesn't snap to whole dashes, which would hold it
 still for a dash's share of the life, nearly a year and a half at 75. It
-carries no text and no red; red stays today's, in the grid. Past the life's end
-the rule is all lit.
+carries no text and no red. Past the life's end the rule is all lit.
 
 The rule takes a band above the month labels. With a numeric `top` the block's
 top edge stays where it was — on the phone, clear of the clock and widgets —
