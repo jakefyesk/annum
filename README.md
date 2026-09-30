@@ -7,8 +7,8 @@ ultrawide monitor — that renders the current year as a horizontal dot grid: se
 rows tall, read left to right, so it scans like a progress bar rather than a
 calendar. Significant dates become
 emoji markers, date ranges tint their dots, and the footer counts down to whatever
-comes next. A birthday adds one more row above the grid, which does for a life
-what the grid does for the year: a dot for each of 75 years.
+comes next. A birthday adds a faint dashed rule above the grid, as wide as the
+year, that fills over a life the way the grid does over a year.
 
 Everything runs on GitHub: Actions renders the images, Pages serves them, an iOS
 Shortcut sets one as your phone's wallpaper each morning, and a LaunchAgent does
@@ -43,8 +43,7 @@ everything in the config is already visible in the wallpaper** — dates, emoji,
 visible labels, which weeks are tinted. The PNG is served unauthenticated. The
 only things the config holds that the image doesn't are the true labels of
 `private: true` milestones and range labels, which are never drawn, and a
-birthday, which it shows as your age and the share of a life lived (but see
-below).
+birthday, which it shows only as the share of a life lived (but see below).
 
 So the thing worth protecting isn't the *content*, it's **discoverability**:
 
@@ -81,13 +80,17 @@ For label-level control, `"private": true` on a milestone keeps its marker and
 countdown but drops the words from the image; `"redactLabels": true` does that
 globally.
 
-A `birthday` is never drawn as a date, but each image shows your age and the
-share of the life lived, which together place it within about nine months at 75
-years (less for a shorter life). And every day is rendered ahead of time at a
-predictable URL beside today's, so anyone with the URL can find the birthday
-itself: it is the day the life row's red dot moves. On a screen other people
-see, like a desktop at work, `"life": false` in that device's `layout` leaves
-the row off.
+A `birthday` is never drawn as a date, and the rule it adds carries no text, so
+no age or percentage is drawn either. But the rule shows the share of the life
+lived as a length, to within a few weeks: a pixel of it is about six weeks of a
+75-year life on the phone, five on the MacBook and seven or eight on the
+ultrawide (fewer for a shorter life). With the life's length, 75 unless you set
+another, that is your age. And every day is rendered ahead of time at a
+predictable URL beside today's, so anyone with the URL who knows how the rule
+is drawn — the code is public — can find the days it grows by a pixel and work
+back from them to the birthday, to the day, and to the life expectancy. On a
+screen other people see, like a desktop at work, `"life": false` in that
+device's `layout` leaves the rule off.
 
 Three checks keep the config out of git history, where no slug would help:
 
@@ -195,7 +198,7 @@ one, whatever is set stays. `birthday off` removes both.
 }
 ```
 
-`layout.top` is the vertical offset of the grid in pixels; a birthday's row
+`layout.top` is the vertical offset of the grid in pixels; a birthday's rule
 pushes the grid a band lower, so the block's top edge stays put (see below).
 The default of 1180 clears the widget stack on an iPhone 14 Pro Max; shift it
 if your lock screen is laid out differently. `markerScale` sizes milestone
@@ -229,25 +232,29 @@ A config made on the site or from the example before centring arrived pins
 it off. `node scripts/events.mjs pull`, delete those keys from `config.json`,
 then `push`.
 
-`birthday` adds a row of dots above the month labels, one for each year of a
-life of `lifeExpectancy` years (rounded, 1 to 150; 75 otherwise), in the
-grid's colours: years lived white, the current one red, the rest grey. The dots
-are grouped by decade, so the age can be counted at a glance. At 75 the row
-spans the grid's dots on every screen, so a year and a life read at the same
-length; some other lengths would have to open the gaps between decades by more
-than a dot-pitch to do that, and stop a little short instead, centred. Over the
-row are your age and the share of the life lived so far, whose percentage ends
-above the year's. Past the last dot the row stays white and the percentage
-keeps counting.
+`birthday` adds a dashed rule above the month labels for a life of
+`lifeExpectancy` years (rounded, 1 to 150; 75 otherwise). It's drawn in the
+grid's rhythm: a dash on each week column, as wide as that column's dots, so it
+runs edge to edge with the grid and a year and a life read at the same length.
+Each dash holds an equal share of the life. The share lived is in the dim grey
+of the footer's year and percentage, the rest in a future day's grey, and the
+dash where they meet is split between the two to the nearest pixel, except that
+neither part is left under 3px, which would read as a stray pixel rather than
+as the rule changing tone: a part that would be thinner goes to nothing or to
+3px, whichever is nearer. It doesn't snap to whole dashes, which would hold it
+still for a dash's share of the life, nearly a year and a half at 75. It
+carries no text and no red; red stays today's, in the grid. Past the life's end
+the rule is all lit.
 
-The row and its caption take a band above the month labels. With a numeric
-`top` the block's top edge stays where it was — on the phone, clear of the
-clock and widgets — and the band pushes the grid and everything under it down,
-so the list has less room above `safeBottom`: on the phone, two rows less (18
-rather than 20 at the default `top`). With `"top": "auto"` the band is part of
-the block that gets centred. `"life": false` in a device's `layout` leaves the
-row off that screen; like `top`, it isn't shared, because the top-level
-`layout` is the phone's own. See Privacy before adding a birthday.
+The rule takes a band above the month labels. With a numeric `top` the block's
+top edge stays where it was — on the phone, clear of the clock and widgets —
+and the band pushes the grid and everything under it down, so the list has less
+room above `safeBottom`: on the phone, one row less (19 rather than 20 at the
+default `top`), which only matters with `maxMilestones` raised past 19. With
+`"top": "auto"` the band is part of the block that gets centred, inside the
+corner marks. `"life": false` in a device's `layout` leaves the rule off that
+screen; like `top`, it isn't shared, because the top-level `layout` is the
+phone's own. See Privacy before adding a birthday.
 
 Below the grid the year countdown comes first and carries the most weight, so a
 milestone number can never be misread as days left in the year. Beneath it every

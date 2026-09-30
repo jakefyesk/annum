@@ -158,10 +158,11 @@
           </td></tr>
         </table>
         <p class="note">
-          A birthday adds a row over the grid, a dot for each year of a life. The date is
-          never drawn, but <strong>your age</strong> and <strong>the share of your life</strong>
-          are, and every day's image sits at a predictable URL beside today's, so anyone with
-          the URL can find <strong>your birthday</strong>: it's the day the row's red dot moves.
+          A birthday adds a dashed rule over the grid, lit as far through a life as you are.
+          No date, age or percentage is drawn, but the lit length shows <strong>how much of your
+          life you've lived</strong>, to within a few weeks. And every day's image sits at a
+          predictable URL beside today's, so anyone with the URL who knows how the rule is
+          drawn can find the days it grows by a pixel, and from them <strong>your birthday</strong>.
         </p>
       </div>
     </section>
@@ -318,12 +319,15 @@ const showTop = () => {
   $('#top').placeholder = String(DEVICES[device].layout.top)
   $('#top').value = typeof state.top[device] === 'number' ? state.top[device] : ''
 }
-// The number that puts the block where auto did. A number fixes the block's
-// first baseline px(46) above it: the month labels', or with a birthday the
-// life caption's, whose band then pushes the grid down. So it's read from that
-// baseline, the preview's first text, not from the grid.
-const autoTop = (device) =>
-  Math.round(+$('#preview svg text').getAttribute('y') + Math.round(46 * DEVICES[device].layout.scale * 10) / 10)
+// The number that puts the block where auto did. A number puts the grid there,
+// or with a birthday a band lower, so it's auto's grid less the band. The grid
+// is px(46) below the preview's first text, the JAN label, which calendar.mjs
+// keeps first; the band is the life rule's `data-band`, and nothing without one.
+const autoTop = (device) => {
+  const svg = $('#preview svg')
+  const band = Number(svg.querySelector('[data-band]')?.getAttribute('data-band') ?? 0)
+  return Math.round(+svg.querySelector('text').getAttribute('y') + Math.round(46 * DEVICES[device].layout.scale * 10) / 10) - band
+}
 $('#device').oninput = () => { showTop(); draw() }
 $('#top').oninput = () => {
   const device = $('#device').value
