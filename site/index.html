@@ -318,7 +318,7 @@ $('#dl').onclick = () => {
 const showTop = () => {
   const device = $('#device').value
   $('#top').placeholder = String(DEVICES[device].layout.top)
-  $('#top').value = typeof state.top[device] === 'number' ? state.top[device] : ''
+  $('#top').value = $('#top').defaultValue = typeof state.top[device] === 'number' ? state.top[device] : ''
 }
 // The number that puts the block where auto did. A number puts the grid there,
 // or with a birthday a band lower, so it's auto's grid less the band. The grid
@@ -336,6 +336,9 @@ $('#top').oninput = () => {
   // An arrow key or the spinner steps an empty field from 0; step from where
   // auto put the grid instead.
   if (state.top[device] === 'auto' && Math.abs(top) === 20) $('#top').value = top += autoTop(device)
+  // The value attribute is the step base, so keep it the value shown and a
+  // step moves by exactly 20.
+  $('#top').defaultValue = $('#top').value
   state.top[device] = top || DEVICES[device].layout.top
   draw()
 }
