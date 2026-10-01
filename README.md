@@ -203,8 +203,8 @@ one, whatever is set stays. `birthday off` removes both.
 ```
 
 `layout.top` is the vertical offset of the grid in pixels; the quarters, and a
-birthday's rule, push the grid a band lower, so the block's top edge stays put
-(see below).
+birthday's rule, each push the grid a band lower, so the block's top edge
+stays put (see below).
 The default of 1180 clears the widget stack on an iPhone 14 Pro Max; shift it
 if your lock screen is laid out differently. `markerScale` sizes milestone
 markers relative to the dot pitch.
@@ -285,9 +285,10 @@ The bars break in the week column a quarter starts in, centred on it like the
 month ticks. The days run down a column, not across it, so a break can be up to
 half a column from the exact day: a quarter that turns mid-week breaks in that
 week, one that starts on a Monday half a column late, one that starts on a
-Sunday half a column early. A bar is lit as far as today's dot, so one whose
-last days share the next quarter's column is full from the first of them, and
-one that ends on a Sunday is still half a column short on its last day.
+Sunday over a third of a column early. A bar is lit as far as today's dot, so
+one whose last days share the next quarter's column is full from the first of
+them, and one that ends on a Sunday is still half a column short on its last
+day.
 
 The quarters take a band of their own, and with a numeric `top` it pushes the
 grid down as the life's rule does: on the phone the list holds 19 rows rather

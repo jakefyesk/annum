@@ -321,16 +321,16 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   // with a dot's gap at each turn. The days run down a column, not across it,
   // so a quarter that turns mid-week, or on a Monday or a Sunday, breaks in
   // that week's column, up to half a column from the exact day: half late for
-  // a Monday, half early for a Sunday. The outer ends are the life rule's, on
-  // the outer dots, so the four still read as the year's one bar. One that's
-  // over is in the dim grey of a life lived, label and bar; the one under way
-  // is lit white to the right edge of today's dot, as today counts as spent,
-  // and the rest of it, like the quarters to come, is in a future day's grey,
-  // under labels in the months' grey. So the only white up here is the quarter
-  // you're in: its label, how far through it you are, and after the label the
-  // days left in it, counted as the footer counts the year's, or on its last
-  // day, that it is. All of it white, so the count can't run on into the next
-  // label.
+  // a Monday, over a third early for a Sunday. The outer ends are the life
+  // rule's, on the outer dots, so the four still read as the year's one bar.
+  // One that's over is in the dim grey of a life lived, label and bar; the one
+  // under way is lit white to the right edge of today's dot, as today counts as
+  // spent, and the rest of it, like the quarters to come, is in a future day's
+  // grey, under labels in the months' grey. So the only white up here is the
+  // quarter you're in: its label, how far through it you are, and after the
+  // label the days left in it, counted as the footer counts the year's, or on
+  // its last day, that it is. All of it white, so the count can't run on into
+  // the next label.
   const labels = []
   if (quarters) {
     const y = Math.round(y0 - px(46) - px(17) * 0.73 - px(24) - dash.h)
