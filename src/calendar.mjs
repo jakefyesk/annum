@@ -48,8 +48,9 @@ export const DEVICES = {
   // larger than the top, so the block doesn't look to be sliding down
   // (framers weight the bottom 8-25%). That puts its centre just above the
   // middle, where the eye reads it as centred. `safeTop` keeps the block's top
-  // edge (the month labels, or with a birthday the life rule) below the
-  // lock screen clock; the block now sits well clear of it.
+  // edge (the quarters' labels, the month labels without them, or with a
+  // birthday the life rule) below the lock screen clock; the block now sits
+  // well clear of it.
   //
   // Both are small and quiet: dots and type shrink together, keeping the
   // pitch-to-type ratio that makes this the same design, down to the smallest
@@ -137,6 +138,15 @@ function lifeOf(config, today) {
   const end = new Date(born).setUTCFullYear(new Date(born).getUTCFullYear() + years)
   return (today - born) / (end - born)
 }
+
+// Where a mark `w` pixels wide that's lit as far as `exact` changes tone: the
+// nearest whole pixel that leaves neither part under 3px. Thinner reads as a
+// stray pixel rather than as the mark changing tone, so a part that would be
+// 1px or 2px goes to nothing or to 3px, whichever is nearer.
+const split = (exact, w) =>
+  [Math.round(exact), 0, 3, w - 3, w]
+    .filter((on) => on === 0 || on === w || (on >= 3 && on <= w - 3))
+    .reduce((a, b) => (Math.abs(b - exact) < Math.abs(a - exact) ? b : a))
 
 // A milestone's label is drawn as literal text in the wallpaper, which is served
 // publicly. `private: true` keeps the marker and the countdown but drops the words.
@@ -226,14 +236,27 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   // width instead, so each dash is centred on its column exactly.
   const whole = Number.isInteger(pitch) && Number.isInteger(x0)
   const dash = { w: whole ? 2 * Math.round(r) : Math.round(2 * r), h: Math.max(1, Math.round(px(3))) }
-  // The band it adds over the month labels: the rule, and a gap to their caps
-  // three times theirs to the ticks, so the labels stay the grid's.
-  const band = lived === null ? 0 : dash.h + Math.round(px(36))
+
+  // The quarters take a band of their own between the life's rule and the
+  // month labels, the order of the spans they mark: a life, the year's
+  // quarters, its months, its days. Their labels' caps, a gap like the months'
+  // to the ticks, the bar, and twice that gap to the months' caps, so each bar
+  // is its label's and the months stay the grid's. `quarters: false` leaves
+  // them off every screen, and in a device's layout, off that one.
+  const quarters = config.quarters !== false && layout.quarters !== false
+  const qband = quarters ? Math.round(px(20) * 0.73 + px(12) + dash.h + px(24)) : 0
+  // The band the life adds over them: the rule, and a gap to the caps below it
+  // three times the months' to the ticks, so the labels stay the grid's. Over
+  // the quarters it's four times, twice a bar's to the months, or the dashed
+  // rule reads as one more of the bars, a rule of the same weight.
+  const band = lived === null ? 0 : dash.h + Math.round(px(quarters ? 48 : 36))
+  // Everything over the month labels.
+  const lift = band + qband
 
   // The block runs from the month labels' cap tops, this far above the grid
-  // (JetBrains Mono's caps are 0.73em tall), or from the life's rule, a band
-  // above them, to the last list row.
-  const above = px(46) + px(17) * 0.73 + band
+  // (JetBrains Mono's caps are 0.73em tall), or from the life's rule or the
+  // quarters' labels, a band or two above them, to the last list row.
+  const above = px(46) + px(17) * 0.73 + lift
 
   // `top: 'auto'` places the whole block so the space below it is `balance`
   // times the space above, and never starts above `safeTop`. The list holds
@@ -254,14 +277,21 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
     const highest = Math.ceil(Number(layout.safeTop ?? 0) + above)
     return Math.max(highest, Math.min(Math.round(space + above), lowest))
   }
-  // A number puts the grid there, or with a birthday a band lower: on a phone
-  // it was chosen to keep the block under the clock and widgets, so the band
-  // pushes the grid down rather than the block up.
-  const y0 = layout.top === 'auto' ? autoTop() : band ? Number(layout.top) + band : layout.top
+  // A number puts the grid there, or with a birthday or the quarters a band or
+  // two lower: on a phone it was chosen to keep the block under the clock and
+  // widgets, so the bands push the grid down rather than the block up.
+  const y0 = layout.top === 'auto' ? autoTop() : lift ? Number(layout.top) + lift : layout.top
   const left = x0 - pitch / 2
   const right = x0 + gridW - pitch / 2
 
   const out = [`<rect width="${W}" height="${H}" fill="${THEME.bg}"/>`]
+
+  // The rules over the month labels, the life's and the quarters' bars, are one
+  // group, whose data-band is the height of everything over the months, the
+  // quarters' labels included. The preview (autoTop in site/index.html) turns
+  // auto's placement into the numeric `top` that keeps it: the grid, px(46)
+  // below the first text, JAN, less the band. The attribute draws nothing.
+  if (lift) out.push(`<g data-band="${lift}">`)
 
   if (lived !== null) {
     // Its top edge is the block's, to the nearest pixel where the month labels'
@@ -270,45 +300,92 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
     const y = Math.round(y0 - above)
     const x = (c) => (c > (cols - 1) / 2 ? W - x(cols - 1 - c) - dash.w : Math.round(x0 + c * pitch - dash.w / 2))
     // Each column holds an equal share of the life. The one `today` falls in is
-    // split where it falls, to the nearest pixel that leaves neither part under
-    // 3px: thinner reads as a stray pixel rather than as the rule changing
-    // tone, so a part that would be 1px or 2px goes to nothing or to 3px,
-    // whichever is nearer. Past the life's end it's all lit.
+    // split where it falls, without slivers (see split). Past the life's end
+    // it's all lit.
     const at = Math.min(lived, 1) * cols
-    const clean = (on) => on === 0 || on === dash.w || (on >= 3 && on <= dash.w - 3)
     const lit = []
     const rest = []
     const seg = (to, from, width) =>
       width > 0 && to.push(`<rect x="${from}" y="${y}" width="${width}" height="${dash.h}"/>`)
     for (let c = 0; c < cols; c++) {
-      const exact = Math.max(0, Math.min(1, at - c)) * dash.w
-      // The rounded width if it's clean, or else the nearer of the clean
-      // widths either side of the sliver it would leave.
-      const on = [Math.round(exact), 0, 3, dash.w - 3, dash.w]
-        .filter(clean)
-        .reduce((a, b) => (Math.abs(b - exact) < Math.abs(a - exact) ? b : a))
+      const on = split(Math.max(0, Math.min(1, at - c)) * dash.w, dash.w)
       seg(lit, x(c), on)
       seg(rest, x(c) + on, dash.w - on)
     }
-    // The preview (autoTop in site/index.html) turns auto's placement into the
-    // numeric `top` that keeps it: the grid, px(46) below the first text, JAN,
-    // less the band, which it reads from here. The attribute draws nothing.
-    out.push(`<g data-band="${band}">`)
     for (const [fill, rects] of [[THEME.dim, lit], [THEME.future, rest]])
       rects.length && out.push(`<g fill="${fill}">${rects.join('')}</g>`)
-    out.push('</g>')
   }
 
+  // The quarters: a bar under each label, from the column its quarter starts in
+  // to the column the next one does, centre to centre like the month ticks,
+  // with a dot's gap at each turn. The days run down a column, not across it,
+  // so a quarter that turns mid-week, or on a Monday or a Sunday, breaks in
+  // that week's column, up to half a column from the exact day: half late for
+  // a Monday, half early for a Sunday. The outer ends are the life rule's, on
+  // the outer dots, so the four still read as the year's one bar. One that's
+  // over is in the dim grey of a life lived, label and bar; the one under way
+  // is lit white to the right edge of today's dot, as today counts as spent,
+  // and the rest of it, like the quarters to come, is in a future day's grey,
+  // under labels in the months' grey. So the only white up here is the quarter
+  // you're in: its label, how far through it you are, and after the label the
+  // days left in it, counted as the footer counts the year's, or on its last
+  // day, that it is. All of it white, so the count can't run on into the next
+  // label.
+  const labels = []
+  if (quarters) {
+    const y = Math.round(y0 - px(46) - px(17) * 0.73 - px(24) - dash.h)
+    const end = Math.round(x0 - dash.w / 2)
+    const gap = Math.round(pitch - 2 * r)
+    const starts = ['01', '04', '07', '10'].map((m) => utc(`${year}-${m}-01`)).concat(utc(`${year + 1}-01-01`))
+    const turn = (q) => Math.round(x0 + byDate.get(iso(starts[q])).col * pitch)
+    const spent = x0 + byDate.get(iso(today)).col * pitch + r
+    // JetBrains Mono advances 0.6em per glyph plus the letter-spacing, as the
+    // footer's clip() assumes.
+    const cell = px(20) * 0.6 + px(2)
+    const bars = { [THEME.dim]: [], [THEME.past]: [], [THEME.future]: [] }
+    const bar = (fill, from, width) =>
+      width > 0 && bars[fill].push(`<rect x="${from}" y="${y}" width="${width}" height="${dash.h}"/>`)
+    for (let q = 0; q < 4; q++) {
+      const a = q === 0 ? end : turn(q) + Math.ceil(gap / 2)
+      const b = q === 3 ? W - end : turn(q + 1) - Math.floor(gap / 2)
+      const now = today >= starts[q] && today < starts[q + 1]
+      const done = today >= starts[q + 1]
+      // Never less than the 3px nub: on a quarter's first days the bar starts
+      // only a pixel or two short of the dot's edge, which split would round
+      // away, and today is spent.
+      const on = now ? Math.max(3, split(Math.min(b, Math.max(a, spent)) - a, b - a)) : done ? b - a : 0
+      bar(now ? THEME.past : THEME.dim, a, on)
+      bar(THEME.future, a + on, b - a - on)
+      // The count stops two cells, a blank one more than a word space, short
+      // of the next label (past the gap at the turn) or of the bar's end, or
+      // it drops DAYS; on the phone a quarter can be twelve columns wide.
+      const n = Math.round((starts[q + 1] - DAY - today) / DAY)
+      const say = (unit) => (n ? `${n} ${unit}` : 'LAST DAY')
+      const long = say(n === 1 ? 'DAY LEFT' : 'DAYS LEFT')
+      const fits = (`Q${q + 1} · ${long}`.length + 2) * cell - px(2) <= (q === 3 ? b : b + gap) - a
+      const text = now ? `<tspan font-weight="700">Q${q + 1}</tspan> · ${fits ? long : say('LEFT')}` : `Q${q + 1}`
+      labels.push(
+        `<text x="${a}" y="${y - px(12)}" font-family="JetBrains Mono" font-weight="500" font-size="${px(20)}" letter-spacing="${px(2)}" fill="${now ? THEME.past : done ? THEME.dim : THEME.label}">${text}</text>`
+      )
+    }
+    for (const [fill, rects] of Object.entries(bars)) rects.length && out.push(`<g fill="${fill}">${rects.join('')}</g>`)
+  }
+  if (lift) out.push('</g>')
+
   // JAN is the image's first text, which the preview finds the grid by (see
-  // data-band above), so nothing before it may be text.
+  // data-band above), so nothing before it may be text, and the quarters'
+  // labels follow the months'. With the quarters on, the ticks where one
+  // starts are in the dim grey of a finished one, a beat that carries each
+  // turn down from the bars to its column.
   for (let m = 0; m < 12; m++) {
     const d = byDate.get(`${year}-${String(m + 1).padStart(2, '0')}-01`)
     const x = x0 + d.col * pitch
-    out.push(`<rect x="${(x - px(1)).toFixed(1)}" y="${y0 - px(34)}" width="${px(2)}" height="${px(12)}" fill="${THEME.future}"/>`)
+    out.push(`<rect x="${(x - px(1)).toFixed(1)}" y="${y0 - px(34)}" width="${px(2)}" height="${px(12)}" fill="${quarters && m % 3 === 0 ? THEME.dim : THEME.future}"/>`)
     out.push(
       `<text x="${x.toFixed(1)}" y="${y0 - px(46)}" font-family="JetBrains Mono" font-weight="500" font-size="${px(17)}" letter-spacing="${px(1.5)}" fill="${THEME.label}" text-anchor="middle">${MONTHS[m]}</text>`
     )
   }
+  out.push(...labels)
 
   const markers = []
   for (const d of days) {

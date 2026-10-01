@@ -136,6 +136,9 @@
           <tr><td style="color:var(--dim)">Shape</td><td>
             <select id="shape"><option value="circle">circle</option><option value="square">square</option></select>
           </td></tr>
+          <tr><td style="color:var(--dim)">Quarters</td><td>
+            <label class="priv"><input id="quarters" type="checkbox" checked autocomplete="off">Q1–Q4 OVER THE MONTHS</label>
+          </td></tr>
           <tr><td style="color:var(--dim)">Top offset</td><td>
             <input id="top" type="number" step="20" autocomplete="off" style="width:90px"> px
           </td></tr>
@@ -243,6 +246,8 @@ function draw() {
   const expectancy = $('#lifeExpectancy').validity.valid ? Number($('#lifeExpectancy').value) : 0
   const json = { _example: false, years: [new Date().getUTCFullYear(), new Date().getUTCFullYear() + 1],
                  layout: { top: state.top.phone, shape: $('#shape').value },
+                 // Only when off; on is the renderer's own default.
+                 ...($('#quarters').checked ? {} : { quarters: false }),
                  // Only offsets you've changed, so the config doesn't pin a preset
                  // (auto-centring above all) that a later version may improve.
                  ...Object.fromEntries(Object.keys(DEVICES)
@@ -321,9 +326,11 @@ const showTop = () => {
   $('#top').value = $('#top').defaultValue = typeof state.top[device] === 'number' ? state.top[device] : ''
 }
 // The number that puts the block where auto did. A number puts the grid there,
-// or with a birthday a band lower, so it's auto's grid less the band. The grid
-// is px(46) below the preview's first text, the JAN label, which calendar.mjs
-// keeps first; the band is the life rule's `data-band`, and nothing without one.
+// or with a birthday or the quarters a band lower, so it's auto's grid less the
+// band. The grid is px(46) below the preview's first text, the JAN label, which
+// calendar.mjs keeps first; the band is the `data-band` on its one group over
+// the months, the quarters and the life's rule together, and nothing when
+// neither is drawn.
 const autoTop = (device) => {
   const svg = $('#preview svg')
   const band = Number(svg.querySelector('[data-band]')?.getAttribute('data-band') ?? 0)
@@ -344,7 +351,7 @@ $('#top').oninput = () => {
 }
 // Once editing ends, show the offset actually in use, not a cleared or 0 field.
 $('#top').onchange = showTop
-for (const id of ['#shape', '#today', '#birthday', '#lifeExpectancy']) $(id).oninput = draw
+for (const id of ['#shape', '#quarters', '#today', '#birthday', '#lifeExpectancy']) $(id).oninput = draw
 // Cleared, it means 75 again; show it, so a step starts there and not from 0.
 $('#lifeExpectancy').onchange = () => { if ($('#lifeExpectancy').value === '') $('#lifeExpectancy').value = 75 }
 
