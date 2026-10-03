@@ -5,6 +5,8 @@
 //   node scripts/events.mjs add 2026-11-01 "NYC Marathon" 🗽 [--private]
 //   node scripts/events.mjs rm "NYC Marathon"
 //   node scripts/events.mjs range 2026-12-20 2026-12-31 [#3D7EFF]
+//   node scripts/events.mjs birthday 1990-05-12 [80]
+//   node scripts/events.mjs birthday off
 //   node scripts/events.mjs pull          # variable -> local config.json
 //   node scripts/events.mjs push          # local config.json -> variable
 //   node scripts/events.mjs deploy        # push, then trigger the workflow
@@ -63,8 +65,10 @@ const fmt = (config) => {
   const rs = (config.ranges ?? []).map(
     (r, i) => `  ${String(i).padStart(2)}  ${r.start} → ${r.end}  ${r.color ?? ''} ${r.label ?? ''}`
   )
+  const life = config.birthday ? `${config.birthday}, life expectancy ${config.lifeExpectancy ?? 75}` : '(none)'
   return [
     `years: ${(config.years ?? []).join(', ')}`,
+    `birthday: ${life}`,
     '',
     `milestones (${ms.length}):`,
     ...(lines.length ? lines : ['  (none)']),
@@ -137,6 +141,36 @@ switch (cmd) {
     break
   }
 
+  case 'birthday': {
+    const [date, years] = args
+    const off = date === 'off'
+    // Refused here rather than published as a bar that never draws: the
+    // renderer skips a date it can't read and one still to come. Date.parse
+    // takes 30 February as 2 March, so only a round trip proves a date.
+    const t = Date.parse(`${date}T00:00:00Z`)
+    const real = /^\d{4}-\d{2}-\d{2}$/.test(date ?? '') && Number.isFinite(t) && new Date(t).toISOString().startsWith(date)
+    const n = Number(years ?? 75)
+    if (!off && (!real || Date.parse(`${date}T00:00:00`) > Date.now() || !Number.isInteger(n) || n < 1 || n > 150)) {
+      console.error('usage: events.mjs birthday <YYYY-MM-DD> [years]   (a real date, not in the future; 1-150 years)')
+      console.error('       events.mjs birthday off')
+      process.exit(1)
+    }
+    const config = read()
+    if (off) {
+      delete config.birthday
+      delete config.lifeExpectancy
+    } else {
+      config.birthday = date
+      // 75 is the renderer's default, so it isn't written down.
+      if (years !== undefined && n === 75) delete config.lifeExpectancy
+      else if (years !== undefined) config.lifeExpectancy = n
+    }
+    write(config)
+    console.log(`${off ? 'birthday removed' : `birthday: ${date}`}\n`)
+    console.log(fmt(config))
+    break
+  }
+
   case 'pull': {
     const config = read()
     writeFileSync(LOCAL, JSON.stringify(config, null, 2) + '\n')
@@ -158,6 +192,6 @@ switch (cmd) {
   }
 
   default:
-    console.error(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 14).join('\n'))
+    console.error(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 15).join('\n'))
     process.exit(1)
 }

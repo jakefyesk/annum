@@ -18,8 +18,13 @@ function loadConfig() {
     } catch {
       // Fail loudly. A malformed value once turned out to be a captured API
       // error body, which decoded to binary and produced a useless stack trace.
+      // But print nothing decoded from it: the log is public, and the runner
+      // masks only the secret itself, so a truncated one would show whatever
+      // it starts with, a birthday or a milestone's label.
       console.error('ANNUM_CONFIG is set but is not base64-encoded JSON.')
-      console.error(`decoded to ${decoded.length} bytes starting: ${JSON.stringify(decoded.slice(0, 60))}`)
+      console.error(
+        `decoded to ${decoded.length} bytes ${decoded.trimStart().startsWith('{') ? 'that start like JSON but do not parse (truncated?)' : 'that are not JSON (an API error body?)'}`
+      )
       process.exit(1)
     }
   }

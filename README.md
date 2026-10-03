@@ -7,7 +7,11 @@ ultrawide monitor — that renders the current year as a horizontal dot grid: se
 rows tall, read left to right, so it scans like a progress bar rather than a
 calendar. Significant dates become
 emoji markers, date ranges tint their dots, and the footer counts down to whatever
-comes next.
+comes next. Over the month labels, a bar for each quarter breaks the year into
+four, and the one you're in counts down its own days, except Q4, whose days left
+are the year's, counted under the grid. A birthday adds a faint dashed rule
+above it all, as wide as the year, that fills over a life the way the grid does
+over a year.
 
 Everything runs on GitHub: Actions renders the images, Pages serves them, an iOS
 Shortcut sets one as your phone's wallpaper each morning, and a LaunchAgent does
@@ -41,7 +45,8 @@ Worth being precise about, because the obvious framing is wrong. **Almost
 everything in the config is already visible in the wallpaper** — dates, emoji,
 visible labels, which weeks are tinted. The PNG is served unauthenticated. The
 only things the config holds that the image doesn't are the true labels of
-`private: true` milestones and range labels, which are never drawn.
+`private: true` milestones and range labels, which are never drawn, and a
+birthday, which it shows only as the share of a life lived (but see below).
 
 So the thing worth protecting isn't the *content*, it's **discoverability**:
 
@@ -78,6 +83,19 @@ For label-level control, `"private": true` on a milestone keeps its marker and
 countdown but drops the words from the image; `"redactLabels": true` does that
 globally.
 
+A `birthday` is never drawn as a date, and the rule it adds carries no text, so
+no age or percentage is drawn either. But the rule shows the share of the life
+lived as a length: a pixel of it is about six weeks of a 75-year life on the
+phone, five on the MacBook and seven or eight on the ultrawide (fewer for a
+shorter life), and it is never more than a pixel and a half out, so one image
+places you in your life to within a month or two, nearly three on the ultrawide.
+With the life's length, 75 unless you set another, that is your age. And every
+day is rendered ahead of time at a predictable URL beside today's, so anyone
+with the URL who knows how the rule is drawn — the code is public — can find the
+days it grows by a pixel and work back from them to the birthday, to the day,
+and to the life expectancy. On a screen other people see, like a desktop at
+work, `"life": false` in that device's `layout` leaves the rule off.
+
 Three checks keep the config out of git history, where no slug would help:
 
 | Check | Where | Catches |
@@ -100,6 +118,8 @@ node scripts/events.mjs add 2026-11-01 "NYC Marathon" 🗽
 node scripts/events.mjs add 2026-07-04 "Something" --private
 node scripts/events.mjs rm "NYC Marathon"
 node scripts/events.mjs range 2026-12-20 2026-12-31
+node scripts/events.mjs birthday 1990-05-12
+node scripts/events.mjs birthday off
 node scripts/events.mjs deploy
 ```
 
@@ -107,6 +127,10 @@ Each command reads the current variable, edits it, writes it back, and mirrors
 the result into a gitignored local `config.json`. `pull` and `push` move between
 the two by hand. Because the variable reads back, this is all editable in
 conversation — "add the marathon on 1 November" is enough.
+
+`birthday` refuses a date that doesn't exist or hasn't come yet. A life
+expectancy in years can follow the date (`birthday 1990-05-12 80`); without
+one, whatever is set stays. `birthday off` removes both.
 
 ## Setup
 
@@ -160,6 +184,9 @@ conversation — "add the marathon on 1 November" is enough.
 {
   "years": [2026, 2027],
   "redactLabels": false,
+  "quarters": true,
+  "birthday": "1990-05-12",
+  "lifeExpectancy": 75,
   "layout": { "top": 1180, "shape": "circle", "markerScale": 1.2 },
   "footer": { "showYear": true, "maxMilestones": 12 },
   "desktop": {
@@ -176,10 +203,13 @@ conversation — "add the marathon on 1 November" is enough.
 }
 ```
 
-`layout.top` is the vertical offset of the grid in pixels. The default of 1180
-clears the widget stack on an iPhone 14 Pro Max; shift it if your lock screen is
-laid out differently. `markerScale` sizes milestone markers relative to the dot
-pitch.
+`layout.top` pins the block's top edge 58px above that pixel, whatever stands
+there: the month labels, or over them the quarters' labels or a birthday's
+rule. Those two each take a band that pushes the grid down rather than the
+block up (see below); with neither, the grid's top row starts 22px above
+`top`. The default of 1180 clears the widget stack on an iPhone 14 Pro Max;
+shift it if your lock screen is laid out differently. `markerScale` sizes
+milestone markers relative to the dot pitch.
 
 `desktop` and `ultrawide` take the same `layout` and `footer` keys for the Mac
 wallpapers, each in its own pixels. Only the look carries over from the top
@@ -194,9 +224,11 @@ Both desktops centre themselves the way a picture framer cuts a mat. With
 above it, so its centre sits just above the middle, where it reads as centred
 rather than sagging. It never starts higher than `safeTop`, the lock screen
 clock's limit, and never so low that the list loses a row. A number instead
-puts the grid's top row at that pixel. Both blocks are kept small and quiet,
-dots and type shrinking together down to the smallest type that still reads,
-so the negative space around them does the framing. The ultrawide's is sized
+pins the block's top edge as it does on the phone, at the same distance scaled
+to the device's type. Both
+blocks are kept small and quiet, dots and type shrinking together down to the
+smallest type that still reads, so the negative space around them does the
+framing. The ultrawide's is sized
 to look like the MacBook's from where each is usually seen — the same visual
 angle, and the same share of the screen's height — rather than to fill as
 much of a screen whose sides are out in peripheral vision. `corners` draws
@@ -208,13 +240,90 @@ A config made on the site or from the example before centring arrived pins
 it off. `node scripts/events.mjs pull`, delete those keys from `config.json`,
 then `push`.
 
+`birthday` adds a dashed rule above the month labels for a life of
+`lifeExpectancy` years (rounded, 1 to 150; 75 otherwise). It's drawn in the
+grid's rhythm: a dash on each week column, as wide as that column's dots, so it
+runs edge to edge with the grid and a year and a life read at the same length.
+Each dash holds an equal share of the life. The share lived is in the dim grey
+of a past milestone's count, the rest in a future day's grey, and the dash
+where they meet is split between the two to the nearest pixel, except that
+neither part is left under 3px, which would read as a stray pixel rather than
+as the rule changing tone: a part that would be thinner goes to nothing or to
+3px, whichever is nearer. It doesn't snap to whole dashes, which would hold it
+still for a dash's share of the life, nearly a year and a half at 75. It
+carries no text and no red. Past the life's end the rule is all lit.
+
+The rule takes a band above the month labels, on the phone 38px over their caps,
+where the quarters' bars would stand, or above the quarters, 56px over their
+labels: half as far again as their bars stand over the months, so it doesn't
+read as one more bar. With a numeric `top` the block's top edge stays put — on
+the phone, clear of the clock and widgets — and the band pushes the grid and
+everything under it down, so the list has less room above `safeBottom`: on the
+phone, one row less (18 rather than 19 at the default `top`, or 19 rather than
+20 without the quarters), which only matters with `maxMilestones` raised
+past 18. Without the quarters it costs none in a 54-week year, whose dots are
+smaller (the next is 2040). With `"top": "auto"` the band is part of the block
+that gets centred, inside the corner marks. `"life": false` in a device's
+`layout` leaves the rule off that screen; like `top`, it isn't shared, because
+the top-level `layout` is the phone's own. See Privacy before adding a birthday.
+
+The quarters sit between the life's rule and the month labels: for each, a
+label over a bar that runs edge to edge with the grid, the four bars broken
+where the quarters turn. A quarter that's over is in the dim grey of a life
+lived, label and bar. The one you're in is named in bold white, and its bar is
+lit white to the right edge of today's dot, since today counts as spent, and in
+a future day's grey beyond; the quarters to come are that grey under labels in
+the months' grey. After the current quarter's name, in the months' grey so the
+name leads, come the days left in it, counted as the footer counts the year's,
+today not among them: `Q3 · 47 DAYS LEFT`, `1 DAY LEFT` on its second-to-last
+day and `LAST DAY` on its last. Through Q4 those are the year's days left,
+which the footer counts just under the grid, so Q4 is named alone until
+`Q4 · LAST DAY` on 31 December; with `footer.showYear` off there is no year
+count to defer to, and Q4 counts like the others. Where the count would come
+within two characters of the next label, or of the bar's end, it drops the word
+`DAYS` (`Q1 · 45 LEFT`). That only happens on the phone, in Q1 of a year that
+starts on a Monday and isn't a leap year (2029, 2035), whose Q1 is twelve
+columns wide.
+
+The month labels need no ticks: each is centred on the column its month starts
+in, and each span stands further off than the one it holds, so every label reads
+as the grid's or its own bar's without a tick to say which. On the phone the
+months' baseline is 24px over the grid, as far as the year count's caps stand
+under it, the quarters' bars 38px over the months' caps, and a birthday's rule
+56px over the quarters' labels; the desktops scale them with their type. The
+bars' breaks over JAN, APR, JUL and OCT carry each turn down to its column.
+
+The bars break in the week column a quarter starts in, centred on it like the
+month labels. The days run down a column, not across it, so a break can be up to
+half a column from the exact day: a quarter that turns mid-week breaks in that
+week, one that starts on a Monday half a column late, one that starts on a
+Sunday over a third of a column early. A bar is lit as far as today's dot, so
+one whose last days share the next quarter's column is full from the first of
+them, and one that ends on a Sunday is still half a column short on its last
+day.
+
+The quarters take a band of their own, and with a numeric `top` it pushes the
+grid down as the life's rule does: on the phone the list holds 19 rows rather
+than 20 at the default `top`, or 18 rather than 19 with a birthday (20 in a
+54-week year). With `"top": "auto"` the band is part of the block that gets
+centred. `"quarters": false` leaves them off every screen, and in a device's
+`layout` leaves them off that one; like `life`, it isn't shared, so the
+top-level `layout` turns them off only on the phone. Off, the month labels are
+the block's top edge, or a birthday's rule stands over them where the bars would
+be.
+
 Below the grid the year countdown comes first and carries the most weight, so a
-milestone number can never be misread as days left in the year. Beneath it every
-milestone is listed in calendar order — not by proximity — with past dates
-counting backwards (`-93`). The list trims itself to `footer.maxMilestones` and
-to whatever fits above `footer.safeBottom`, which keeps it clear of the lock
-screen controls. When it trims, the oldest past dates go first, so every
-upcoming milestone stays listed as long as there's room.
+milestone number can never be misread as days left in the year: `89 DAYS LEFT`,
+`1 DAY LEFT` on 30 December and `0 DAYS LEFT` on the 31st. Today's date stands
+over `DAYS LEFT` in the months' grey, its caps level with the number's, so the
+two small lines are as tall as the big one and the date takes no line of its
+own. Nothing stands at the line's far end: the grid already shows how much of
+the year is gone. Beneath the count every milestone is listed in calendar order
+— not by proximity — with past dates counting backwards (`-93`). The list trims
+itself to `footer.maxMilestones` and to whatever fits above `footer.safeBottom`,
+which keeps it clear of the lock screen controls. When it trims, the oldest past
+dates go first, so every upcoming milestone stays listed as long as there's
+room.
 
 Emoji are Fluent Emoji 3D PNGs, because CI has no colour emoji font. Any of the
 ~1,600 emoji in `emoji/fluent-index.json` just works: if your config references

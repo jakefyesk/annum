@@ -44,8 +44,8 @@ for (const file of tracked()) {
     if (hit) problems.push(`${file}: looks like a ${what} — "${hit[0].slice(0, 24)}…"`)
   }
 
-  // Only the example file may carry a milestones/ranges block, and it must
-  // declare itself an example.
+  // Only the example file may carry milestones, ranges or a birthday, and it
+  // must declare itself an example.
   if (file.endsWith('.json')) {
     let parsed
     try {
@@ -55,7 +55,7 @@ for (const file of tracked()) {
     }
     const hasPersonal = parsed && (parsed.milestones || parsed.ranges || parsed.birthday)
     if (hasPersonal && parsed._example !== true) {
-      problems.push(`${file}: contains milestones/ranges but is not marked "_example": true`)
+      problems.push(`${file}: contains milestones, ranges or a birthday but is not marked "_example": true`)
     }
   }
 }

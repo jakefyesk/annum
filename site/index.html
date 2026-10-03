@@ -136,6 +136,9 @@
           <tr><td style="color:var(--dim)">Shape</td><td>
             <select id="shape"><option value="circle">circle</option><option value="square">square</option></select>
           </td></tr>
+          <tr><td style="color:var(--dim)">Quarters</td><td>
+            <label class="priv"><input id="quarters" type="checkbox" checked autocomplete="off">Q1–Q4 OVER THE MONTHS</label>
+          </td></tr>
           <tr><td style="color:var(--dim)">Top offset</td><td>
             <input id="top" type="number" step="20" autocomplete="off" style="width:90px"> px
           </td></tr>
@@ -143,6 +146,28 @@
             <input id="today" type="date">
           </td></tr>
         </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Life</h2>
+      <div class="body">
+        <table>
+          <tr><td style="color:var(--dim)">Birthday</td><td>
+            <input id="birthday" type="date" autocomplete="off">
+          </td></tr>
+          <tr><td style="color:var(--dim)">Life expectancy</td><td>
+            <input id="lifeExpectancy" type="number" value="75" min="1" max="150" step="1" placeholder="75" autocomplete="off" style="width:90px"> years
+          </td></tr>
+        </table>
+        <p class="note">
+          A birthday adds a dashed rule over the grid, lit as far through a life as you are.
+          No date, age or percentage is drawn, but the lit length shows <strong>how much of your
+          life you've lived</strong>, to within a month or two, nearly three on the ultrawide.
+          And every day's image sits at a predictable URL beside today's, so anyone with the
+          URL who knows how the rule is drawn can find the days it grows by a pixel, and from
+          them <strong>your birthday</strong>.
+        </p>
       </div>
     </section>
 
@@ -172,7 +197,9 @@
 import { renderSVG, DEVICES } from './calendar.mjs'
 
 const $ = (s) => document.querySelector(s)
-const todayISO = new Date().toISOString().slice(0, 10)
+// The local day, as the phone and the Mac pick it; toISOString alone gives UTC's.
+const now = new Date()
+const todayISO = new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 
 const state = {
   milestones: [
@@ -215,15 +242,25 @@ async function loadSprite(ch) {
 
 function draw() {
   // The preview renders the exact config it hands you, so the two can't disagree.
+  // Typing isn't held to a field's min, max or step, so a value its field
+  // marks invalid counts as unset, as events.mjs would refuse it.
+  const birthday = $('#birthday').validity.valid ? $('#birthday').value : ''
+  const expectancy = $('#lifeExpectancy').validity.valid ? Number($('#lifeExpectancy').value) : 0
   const json = { _example: false, years: [new Date().getUTCFullYear(), new Date().getUTCFullYear() + 1],
                  layout: { top: state.top.phone, shape: $('#shape').value },
+                 // Only when off; on is the renderer's own default.
+                 ...($('#quarters').checked ? {} : { quarters: false }),
                  // Only offsets you've changed, so the config doesn't pin a preset
                  // (auto-centring above all) that a later version may improve.
                  ...Object.fromEntries(Object.keys(DEVICES)
                    .filter((id) => id !== 'phone' && state.top[id] !== DEVICES[id].layout.top)
                    .map((id) => [id, { layout: { top: state.top[id] } }])),
                  milestones: state.milestones.filter((m) => m.date),
-                 ranges: state.ranges.filter((r) => r.start && r.end) }
+                 ranges: state.ranges.filter((r) => r.start && r.end),
+                 // Only what you've set; 75 is the renderer's own default. Last,
+                 // so the birthday isn't among the first bytes of the config.
+                 ...(birthday ? { birthday } : {}),
+                 ...(expectancy && expectancy !== 75 ? { lifeExpectancy: expectancy } : {}) }
   const device = $('#device').value
   $('#preview').innerHTML = renderSVG({ todayStr: $('#today').value || todayISO, config: json, device, sprites })
   $('#b64').value = btoa(unescape(encodeURIComponent(JSON.stringify(json))))
@@ -288,27 +325,41 @@ $('#dl').onclick = () => {
 const showTop = () => {
   const device = $('#device').value
   $('#top').placeholder = String(DEVICES[device].layout.top)
-  $('#top').value = typeof state.top[device] === 'number' ? state.top[device] : ''
+  $('#top').value = $('#top').defaultValue = typeof state.top[device] === 'number' ? state.top[device] : ''
 }
-// Where auto put the grid: the January tick, the preview's first future-grey
-// rect, sits px(34) above it.
-const autoTop = (device) =>
-  +$('#preview svg rect[fill="#333333"]').getAttribute('y') + Math.round(34 * DEVICES[device].layout.scale * 10) / 10
+// The number that puts the block where auto did. A number pins the block's top
+// edge: the month labels' baseline stands px(46) over it, and a birthday or the
+// quarters push them a band or two lower, so it's px(46) under auto's month
+// labels, less the band. Their baseline is the y of the preview's first text,
+// the JAN label, which calendar.mjs keeps first; the band is the `data-band` on
+// its one group over the months, the quarters and the life's rule together, and
+// nothing when neither is drawn.
+const autoTop = (device) => {
+  const svg = $('#preview svg')
+  const band = Number(svg.querySelector('[data-band]')?.getAttribute('data-band') ?? 0)
+  return Math.round(+svg.querySelector('text').getAttribute('y') + Math.round(46 * DEVICES[device].layout.scale * 10) / 10) - band
+}
 $('#device').oninput = () => { showTop(); draw() }
 $('#top').oninput = () => {
   const device = $('#device').value
   let top = Number($('#top').value)
-  // An arrow key or the spinner steps an empty field from 0; step from where
-  // auto put the grid instead.
+  // An arrow key or the spinner steps an empty field from 0; step from the
+  // number that holds auto's placement instead.
   if (state.top[device] === 'auto' && Math.abs(top) === 20) $('#top').value = top += autoTop(device)
+  // The value attribute is the step base, so keep it the value shown and a
+  // step moves by exactly 20.
+  $('#top').defaultValue = $('#top').value
   state.top[device] = top || DEVICES[device].layout.top
   draw()
 }
 // Once editing ends, show the offset actually in use, not a cleared or 0 field.
 $('#top').onchange = showTop
-for (const id of ['#shape', '#today']) $(id).oninput = draw
+for (const id of ['#shape', '#quarters', '#today', '#birthday', '#lifeExpectancy']) $(id).oninput = draw
+// Cleared, it means 75 again; show it, so a step starts there and not from 0.
+$('#lifeExpectancy').onchange = () => { if ($('#lifeExpectancy').value === '') $('#lifeExpectancy').value = 75 }
 
 $('#today').value = todayISO
+$('#birthday').max = todayISO
 showTop()
 rowsM(); rowsR()
 state.milestones.forEach((m) => loadSprite(m.emoji))

@@ -44,10 +44,13 @@ for (const abs of walk(DIST)) {
     continue
   }
 
-  // Text files in the payload must not carry a milestone block.
+  // Text files in the payload must not carry a milestone block or a birthday.
   const body = readFileSync(abs, 'utf8')
   if (/"milestones"\s*:\s*\[\s*\{/.test(body)) {
     problems.push(`${rel}: embeds a populated milestones array`)
+  }
+  if (/"birthday"\s*:\s*"\d/.test(body)) {
+    problems.push(`${rel}: embeds a birthday`)
   }
 }
 
