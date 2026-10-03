@@ -8,9 +8,10 @@ rows tall, read left to right, so it scans like a progress bar rather than a
 calendar. Significant dates become
 emoji markers, date ranges tint their dots, and the footer counts down to whatever
 comes next. Over the month labels, a bar for each quarter breaks the year into
-four, and the one you're in counts down its own days. A birthday adds a faint
-dashed rule above it all, as wide as the year, that fills over a life the way
-the grid does over a year.
+four, and the one you're in counts down its own days, except Q4, whose days left
+are the year's, counted under the grid. A birthday adds a faint dashed rule
+above it all, as wide as the year, that fills over a life the way the grid does
+over a year.
 
 Everything runs on GitHub: Actions renders the images, Pages serves them, an iOS
 Shortcut sets one as your phone's wallpaper each morning, and a LaunchAgent does
@@ -252,19 +253,19 @@ as the rule changing tone: a part that would be thinner goes to nothing or to
 still for a dash's share of the life, nearly a year and a half at 75. It
 carries no text and no red. Past the life's end the rule is all lit.
 
-The rule takes a band above the month labels, 38px over their caps, where the
-quarters' bars would stand, or above the quarters, 56px over their labels: half
-as far again as their bars stand over the months, so it doesn't read as one
-more bar. With a numeric `top` the block's top edge stays put — on the phone,
-clear of the clock and widgets — and the band pushes the grid and everything
-under it down, so the list has less room above `safeBottom`: on the phone, one
-row less (18 rather than 19 at the default `top`, or 19 rather than 20 without
-the quarters), which only matters with `maxMilestones` raised past 18. Without
-the quarters it costs none in a 54-week year, whose dots are smaller (the next
-is 2040). With `"top": "auto"` the band is part of the block that gets centred,
-inside the corner marks. `"life": false` in a device's `layout` leaves the rule
-off that screen; like `top`, it isn't shared, because the top-level `layout` is
-the phone's own. See Privacy before adding a birthday.
+The rule takes a band above the month labels, on the phone 38px over their caps,
+where the quarters' bars would stand, or above the quarters, 56px over their
+labels: half as far again as their bars stand over the months, so it doesn't
+read as one more bar. With a numeric `top` the block's top edge stays put — on
+the phone, clear of the clock and widgets — and the band pushes the grid and
+everything under it down, so the list has less room above `safeBottom`: on the
+phone, one row less (18 rather than 19 at the default `top`, or 19 rather than
+20 without the quarters), which only matters with `maxMilestones` raised
+past 18. Without the quarters it costs none in a 54-week year, whose dots are
+smaller (the next is 2040). With `"top": "auto"` the band is part of the block
+that gets centred, inside the corner marks. `"life": false` in a device's
+`layout` leaves the rule off that screen; like `top`, it isn't shared, because
+the top-level `layout` is the phone's own. See Privacy before adding a birthday.
 
 The quarters sit between the life's rule and the month labels: for each, a
 label over a bar that runs edge to edge with the grid, the four bars broken
@@ -285,12 +286,12 @@ starts on a Monday and isn't a leap year (2029, 2035), whose Q1 is twelve
 columns wide.
 
 The month labels need no ticks: each is centred on the column its month starts
-in, and each span stands further off than the one it holds, so every label
-reads as the grid's or its own bar's without a tick to say which. The months'
-baseline is 24px over the grid, as far as the year count's caps stand under it,
-the quarters' bars 38px over the months' caps, and a birthday's rule 56px over
-the quarters' labels. The bars' breaks over JAN, APR, JUL and OCT carry each
-turn down to its column.
+in, and each span stands further off than the one it holds, so every label reads
+as the grid's or its own bar's without a tick to say which. On the phone the
+months' baseline is 24px over the grid, as far as the year count's caps stand
+under it, the quarters' bars 38px over the months' caps, and a birthday's rule
+56px over the quarters' labels; the desktops scale them with their type. The
+bars' breaks over JAN, APR, JUL and OCT carry each turn down to its column.
 
 The bars break in the week column a quarter starts in, centred on it like the
 month labels. The days run down a column, not across it, so a break can be up to
