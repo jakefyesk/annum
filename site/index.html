@@ -197,7 +197,9 @@
 import { renderSVG, DEVICES } from './calendar.mjs'
 
 const $ = (s) => document.querySelector(s)
-const todayISO = new Date().toISOString().slice(0, 10)
+// The local day, as the phone and the Mac pick it; toISOString alone gives UTC's.
+const now = new Date()
+const todayISO = new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 
 const state = {
   milestones: [
