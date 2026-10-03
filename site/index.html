@@ -325,12 +325,13 @@ const showTop = () => {
   $('#top').placeholder = String(DEVICES[device].layout.top)
   $('#top').value = $('#top').defaultValue = typeof state.top[device] === 'number' ? state.top[device] : ''
 }
-// The number that puts the block where auto did. A number puts the grid there,
-// or with a birthday or the quarters a band lower, so it's auto's grid less the
-// band. The grid is px(46) below the preview's first text, the JAN label, which
-// calendar.mjs keeps first; the band is the `data-band` on its one group over
-// the months, the quarters and the life's rule together, and nothing when
-// neither is drawn.
+// The number that puts the block where auto did. A number pins the block's top
+// edge: the month labels' baseline stands px(46) over it, and a birthday or the
+// quarters push them a band or two lower, so it's px(46) under auto's month
+// labels, less the band. Their baseline is the y of the preview's first text,
+// the JAN label, which calendar.mjs keeps first; the band is the `data-band` on
+// its one group over the months, the quarters and the life's rule together, and
+// nothing when neither is drawn.
 const autoTop = (device) => {
   const svg = $('#preview svg')
   const band = Number(svg.querySelector('[data-band]')?.getAttribute('data-band') ?? 0)
@@ -340,8 +341,8 @@ $('#device').oninput = () => { showTop(); draw() }
 $('#top').oninput = () => {
   const device = $('#device').value
   let top = Number($('#top').value)
-  // An arrow key or the spinner steps an empty field from 0; step from where
-  // auto put the grid instead.
+  // An arrow key or the spinner steps an empty field from 0; step from the
+  // number that holds auto's placement instead.
   if (state.top[device] === 'auto' && Math.abs(top) === 20) $('#top').value = top += autoTop(device)
   // The value attribute is the step base, so keep it the value shown and a
   // step moves by exactly 20.
