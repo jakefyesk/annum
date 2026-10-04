@@ -20,7 +20,7 @@ function loadConfig() {
       // error body, which decoded to binary and produced a useless stack trace.
       // But print nothing decoded from it: the log is public, and the runner
       // masks only the secret itself, so a truncated one would show whatever
-      // it starts with, a birthday or a milestone's label.
+      // it starts with, which can be a milestone's label.
       console.error('ANNUM_CONFIG is set but is not base64-encoded JSON.')
       console.error(
         `decoded to ${decoded.length} bytes ${decoded.trimStart().startsWith('{') ? 'that start like JSON but do not parse (truncated?)' : 'that are not JSON (an API error body?)'}`

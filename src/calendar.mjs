@@ -123,22 +123,6 @@ function buildYear(year, today) {
   return days
 }
 
-// The share of a life of `lifeExpectancy` years (rounded, 1 to 150; 75
-// otherwise) that `today` has used, past 1 once it's over, or null without a
-// real birthday or before it. The life ends on the birthday that many years
-// on, which setUTCFullYear rolls from 29 February to 1 March in a year without
-// one. (Date.UTC would read years 0-99 as 1900-1999.)
-function lifeOf(config, today) {
-  const b = config.birthday
-  const born = typeof b === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b) ? utc(b) : NaN
-  // Date.parse takes 30 February as 2 March, so only a round trip proves a date.
-  if (!Number.isFinite(born) || iso(born) !== b || today < born) return null
-  const asked = Math.round(Number(config.lifeExpectancy ?? 75))
-  const years = asked >= 1 && asked <= 150 ? asked : 75
-  const end = new Date(born).setUTCFullYear(new Date(born).getUTCFullYear() + years)
-  return (today - born) / (end - born)
-}
-
 // Where a mark `w` pixels wide that's lit as far as `exact` changes tone: the
 // nearest whole pixel that leaves neither part under 3px. Thinner reads as a
 // stray pixel rather than as the mark changing tone, so a part that would be
@@ -222,55 +206,35 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   const x0 = (W - gridW) / 2 + pitch / 2
   const gridH = 7 * pitch
 
-  // With a birthday, a life, drawn under the grid as a dashed rule: a dash on
-  // each week column, as wide as that column's dots, so it runs edge to edge
-  // with the grid in the grid's own rhythm, and a year and a life read at the
-  // same length. The share lived is in the dim grey of a past milestone's
-  // count, the rest in a future day's, and the dash where they meet is split
-  // between the two rather than lit red. Nothing is written on it.
-  // `life: false` in a device's layout leaves it off that screen.
-  const lived = layout.life === false ? null : lifeOf(config, today)
-  // Whole pixels, the dots' width rounded, so the gaps between dashes are the
-  // gaps between dots to within a pixel. Where every column is centred on a
-  // whole pixel, as on both desktops in a 53-week year, it's the nearest even
-  // width instead, so each dash is centred on its column exactly.
-  const whole = Number.isInteger(pitch) && Number.isInteger(x0)
-  const dash = { w: whole ? 2 * Math.round(r) : Math.round(2 * r), h: Math.max(1, Math.round(px(3))) }
-
   // The month labels head the grid, their baseline px(24) over it, as far as
   // the quarters' caps stand under it, so the grid sits between its labels
   // like a picture in a mat. No ticks: each label is centred on the column its
   // month starts in.
   const over = px(24)
 
-  // Under the grid the progress marks run on from the days to longer spans,
-  // the year's quarters and then a life, before the footer: the three read as
-  // one graphic, the grid and two rules under it, and the count and the list
-  // follow. Each mark stands further off than the one over it, so every label
-  // reads as its own bar's without a tick to say which: the quarters' caps
-  // px(24) under the grid, their bars px(12) under the labels' baseline, and
-  // the life's rule px(38) under the bars, so it reads as a rule of its own
-  // rather than one more of the bars, a rule of the same weight. Without the
-  // quarters it takes their labels' place, px(24) under the grid as the
-  // months' baseline is over it: there it's the grid's, and the count stands
-  // more than twice as far off. At px(38) it would hang nearly midway between
-  // the two and read as neither's. Offsets are whole pixels from the grid's
-  // bottom edge, the one the month labels stand over at its top.
+  // Under the grid the year's quarters carry the progress on from the days to
+  // a longer span, before the footer: the grid and the bars under it read as
+  // one graphic, and the count and the list follow. The quarters' caps stand
+  // px(24) under the grid, as far as the months' baseline stands over it, and
+  // their bars px(12) under the labels' baseline, nearer than the grid, so
+  // each label reads as its own bar's without a tick to say which. Offsets
+  // are whole pixels from the grid's bottom edge, the one the month labels
+  // stand over at its top. The bars are px(3) tall, in whole pixels too.
   // `quarters: false` leaves the quarters off every screen, and in a device's
   // layout, off that one.
   const quarters = config.quarters !== false && layout.quarters !== false
   const qbar = quarters ? Math.round(over + px(20) * 0.73 + px(12)) : null
-  const rule = lived === null ? null : quarters ? qbar + dash.h + Math.round(px(38)) : Math.round(over)
-  // The marks' lowest edge under the grid's, or 0 with neither.
-  const marks = rule !== null ? rule + dash.h : quarters ? qbar + dash.h : 0
+  const barH = Math.max(1, Math.round(px(3)))
+  // The quarters' lowest edge under the grid's, or 0 without them.
+  const marks = quarters ? qbar + barH : 0
   // The year count's baseline under the grid's top. With nothing under the
   // grid its caps (0.73em) stand px(24) under it, as far as the months'
-  // baseline stands over it, and px(74) puts them there. The marks take it
-  // down until its caps stand px(56) under the lowest of them, further off
-  // than any mark from the one over it, so the rules stay the grid's and the
-  // count starts the numbers. They take it down in whole pixels, as they're
-  // drawn, so its type falls on the pixels just as it does without them.
-  // Everything under it moves down as far.
+  // baseline stands over it, and px(74) puts them there. The quarters take it
+  // down until its caps stand px(56) under their bars, further off than the
+  // quarters stand from the grid, so the bars stay the grid's and the count
+  // starts the numbers. They take it down in whole pixels, as they're drawn,
+  // so its type falls on the pixels just as it does without them. Everything
+  // under it moves down as far.
   const countAt = gridH + px(74) + (marks && Math.round(marks + px(56) - over))
 
   // The block runs from the month labels' cap tops, this far above the grid
@@ -299,9 +263,9 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   // stands px(46) over it, which on a phone was chosen to keep the block under
   // the clock and widgets. Nothing stands over the months, so the grid always
   // starts px(46) less px(24), rounded, over `top`, 22px on the phone, with
-  // the marks or without them; they push the count and the list down instead.
-  // So the preview's autoTop, JAN's baseline plus px(46), rounded, gives back
-  // the `top` that holds auto's placement.
+  // the quarters or without them; they push the count and the list down
+  // instead. So the preview's autoTop, JAN's baseline plus px(46), rounded,
+  // gives back the `top` that holds auto's placement.
   const y0 = layout.top === 'auto' ? autoTop() : Number(layout.top) - Math.round(px(46) - over)
   const left = x0 - pitch / 2
   const right = x0 + gridW - pitch / 2
@@ -353,7 +317,7 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   }
 
   // ---- Marks --------------------------------------------------------------
-  // The quarters, then a life, hung from the grid's bottom edge (see qbar).
+  // The quarters, hung from the grid's bottom edge (see qbar).
 
   const edge = y0 + gridH
   // The block's lowest edge or baseline so far, for the corner marks.
@@ -365,19 +329,25 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   // so a quarter that turns mid-week, or on a Monday or a Sunday, breaks in
   // that week's column, up to half a column from the exact day: half late for
   // a Monday, over a third early for a Sunday. The outer ends are on the outer
-  // dots, like the life rule's, so the four still read as the year's one bar,
-  // and the breaks sit under APR, JUL and OCT, across the grid.
-  // One that's over is in the dim grey of a life lived, label and bar; the one
-  // under way is lit white to the right edge of today's dot, as today counts as
-  // spent, and the rest of it, like the quarters to come, is in a future day's
-  // grey, under labels in the months' grey. So the only white under the grid,
-  // before the count, is the quarter you're in: its name, in bold, and how far
-  // through it you are. After the name, in the months' grey, come the days
-  // left in it, counted as the footer counts the year's, or on its last day,
-  // that it is.
+  // dots' outer edges, so the four still read as the year's one bar, and the
+  // breaks sit under APR, JUL and OCT, across the grid.
+  // One that's over is in the dim grey of a past milestone's count, label and
+  // bar; the one under way is lit white to the right edge of today's dot, as
+  // today counts as spent, and the rest of it, like the quarters to come, is in
+  // a future day's grey, under labels in the months' grey. So the only white
+  // under the grid, before the count, is the quarter you're in: its name, in
+  // bold, and how far through it you are. After the name, in the months' grey,
+  // come the days left in it, counted as the footer counts the year's, or on
+  // its last day, that it is.
   if (quarters) {
     const y = Math.round(edge + qbar)
-    const end = Math.round(x0 - dash.w / 2)
+    // The ends in whole pixels: half the dots' width, rounded, out from the
+    // outer columns' centres. Where every column is centred on a whole pixel,
+    // as on both desktops in a 53-week year, the width is rounded to an even
+    // number, so the edge lands on a whole pixel without a second rounding.
+    // The right end mirrors the left.
+    const dotW = Number.isInteger(pitch) && Number.isInteger(x0) ? 2 * Math.round(r) : Math.round(2 * r)
+    const end = Math.round(x0 - dotW / 2)
     const gap = Math.round(pitch - 2 * r)
     const starts = ['01', '04', '07', '10'].map((m) => utc(`${year}-${m}-01`)).concat(utc(`${year + 1}-01-01`))
     const turn = (q) => Math.round(x0 + byDate.get(iso(starts[q])).col * pitch)
@@ -387,7 +357,7 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
     const cell = px(20) * 0.6 + px(2)
     const bars = { [THEME.dim]: [], [THEME.past]: [], [THEME.future]: [] }
     const bar = (fill, from, width) =>
-      width > 0 && bars[fill].push(`<rect x="${from}" y="${y}" width="${width}" height="${dash.h}"/>`)
+      width > 0 && bars[fill].push(`<rect x="${from}" y="${y}" width="${width}" height="${barH}"/>`)
     const labels = []
     for (let q = 0; q < 4; q++) {
       const a = q === 0 ? end : turn(q) + Math.ceil(gap / 2)
@@ -401,7 +371,7 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
       bar(now ? THEME.past : THEME.dim, a, on)
       bar(THEME.future, a + on, b - a - on)
       // Through Q4 the days left in it are the year's, which the year's count
-      // under the marks gives in bigger type, so there the name stands alone
+      // under the bars gives in bigger type, so there the name stands alone
       // until its last day. Without the year's count it counts like any other,
       // so the number is never lost. The count stops two cells, a blank one
       // more than a word space, short of the next label (past the gap at the
@@ -419,30 +389,7 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
     }
     for (const [fill, rects] of Object.entries(bars)) rects.length && out.push(`<g fill="${fill}">${rects.join('')}</g>`)
     out.push(...labels)
-    bottom = y + dash.h
-  }
-
-  if (lived !== null) {
-    // Mirrored about the centre, like the corner marks, so both ends sit alike
-    // on the outer dots whichever way a half pixel rounds.
-    const y = Math.round(edge + rule)
-    const x = (c) => (c > (cols - 1) / 2 ? W - x(cols - 1 - c) - dash.w : Math.round(x0 + c * pitch - dash.w / 2))
-    // Each column holds an equal share of the life. The one `today` falls in is
-    // split where it falls, without slivers (see split). Past the life's end
-    // it's all lit.
-    const at = Math.min(lived, 1) * cols
-    const lit = []
-    const rest = []
-    const seg = (to, from, width) =>
-      width > 0 && to.push(`<rect x="${from}" y="${y}" width="${width}" height="${dash.h}"/>`)
-    for (let c = 0; c < cols; c++) {
-      const on = split(Math.max(0, Math.min(1, at - c)) * dash.w, dash.w)
-      seg(lit, x(c), on)
-      seg(rest, x(c) + on, dash.w - on)
-    }
-    for (const [fill, rects] of [[THEME.dim, lit], [THEME.future, rest]])
-      rects.length && out.push(`<g fill="${fill}">${rects.join('')}</g>`)
-    bottom = y + dash.h
+    bottom = y + barH
   }
 
   // ---- Footer -------------------------------------------------------------
@@ -451,8 +398,8 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   const daysTo = (m) => Math.round((utc(m.date) - today) / DAY)
   let y = y0 + countAt
 
-  // The year countdown sits directly under the marks and carries the most
-  // weight, so a milestone's number can never be mistaken for it.
+  // The year countdown leads the footer and carries the most weight, so a
+  // milestone's number can never be mistaken for it.
   if (footer.showYear) {
     const daysLeft = Math.round((utc(`${year}-12-31`) - today) / DAY)
     const big = String(daysLeft)
