@@ -136,6 +136,9 @@
           <tr><td style="color:var(--dim)">Shape</td><td>
             <select id="shape"><option value="circle">circle</option><option value="square">square</option></select>
           </td></tr>
+          <tr><td style="color:var(--dim)">Quarters</td><td>
+            <label class="priv"><input id="quarters" type="checkbox" checked autocomplete="off">Q1–Q4 UNDER THE GRID</label>
+          </td></tr>
           <tr><td style="color:var(--dim)">Top offset</td><td>
             <input id="top" type="number" step="20" autocomplete="off" style="width:90px"> px
           </td></tr>
@@ -172,7 +175,9 @@
 import { renderSVG, DEVICES } from './calendar.mjs'
 
 const $ = (s) => document.querySelector(s)
-const todayISO = new Date().toISOString().slice(0, 10)
+// The local day, as the phone and the Mac pick it; toISOString alone gives UTC's.
+const now = new Date()
+const todayISO = new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 
 const state = {
   milestones: [
@@ -217,6 +222,8 @@ function draw() {
   // The preview renders the exact config it hands you, so the two can't disagree.
   const json = { _example: false, years: [new Date().getUTCFullYear(), new Date().getUTCFullYear() + 1],
                  layout: { top: state.top.phone, shape: $('#shape').value },
+                 // Only when off; on is the renderer's own default.
+                 ...($('#quarters').checked ? {} : { quarters: false }),
                  // Only offsets you've changed, so the config doesn't pin a preset
                  // (auto-centring above all) that a later version may improve.
                  ...Object.fromEntries(Object.keys(DEVICES)
@@ -288,25 +295,33 @@ $('#dl').onclick = () => {
 const showTop = () => {
   const device = $('#device').value
   $('#top').placeholder = String(DEVICES[device].layout.top)
-  $('#top').value = typeof state.top[device] === 'number' ? state.top[device] : ''
+  $('#top').value = $('#top').defaultValue = typeof state.top[device] === 'number' ? state.top[device] : ''
 }
-// Where auto put the grid: the January tick, the preview's first future-grey
-// rect, sits px(34) above it.
+// The number that puts the block where auto did. A number pins the month
+// labels' caps, the block's top edge, over it: the grid starts round(px(46) −
+// px(24)) over the number, and the labels' baseline px(24) over the grid,
+// whatever else is drawn, since the quarters hang under the grid. That
+// baseline is the y of the preview's first text, the JAN label, which
+// calendar.mjs keeps first, so round(JAN's y + px(46)) is the number that
+// holds auto's placement.
 const autoTop = (device) =>
-  +$('#preview svg rect[fill="#333333"]').getAttribute('y') + Math.round(34 * DEVICES[device].layout.scale * 10) / 10
+  Math.round(+$('#preview svg text').getAttribute('y') + Math.round(46 * DEVICES[device].layout.scale * 10) / 10)
 $('#device').oninput = () => { showTop(); draw() }
 $('#top').oninput = () => {
   const device = $('#device').value
   let top = Number($('#top').value)
-  // An arrow key or the spinner steps an empty field from 0; step from where
-  // auto put the grid instead.
+  // An arrow key or the spinner steps an empty field from 0; step from the
+  // number that holds auto's placement instead.
   if (state.top[device] === 'auto' && Math.abs(top) === 20) $('#top').value = top += autoTop(device)
+  // The value attribute is the step base, so keep it the value shown and a
+  // step moves by exactly 20.
+  $('#top').defaultValue = $('#top').value
   state.top[device] = top || DEVICES[device].layout.top
   draw()
 }
 // Once editing ends, show the offset actually in use, not a cleared or 0 field.
 $('#top').onchange = showTop
-for (const id of ['#shape', '#today']) $(id).oninput = draw
+for (const id of ['#shape', '#quarters', '#today']) $(id).oninput = draw
 
 $('#today').value = todayISO
 showTop()

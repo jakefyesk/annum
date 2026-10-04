@@ -3,11 +3,13 @@
 A year, one dot at a time.
 
 A lock screen wallpaper — with matching desktops for a MacBook Pro 14″ and an
-ultrawide monitor — that renders the current year as a horizontal dot grid: seven
-rows tall, read left to right, so it scans like a progress bar rather than a
-calendar. Significant dates become
-emoji markers, date ranges tint their dots, and the footer counts down to whatever
-comes next.
+ultrawide monitor — that renders the current year as a horizontal dot grid:
+seven rows tall, read left to right, so it scans like a progress bar rather than
+a calendar. Significant dates become emoji markers and date ranges tint their
+dots. Under the grid, a bar for each quarter breaks the year into four, and the
+one you're in counts down its own days, except Q4, whose days left are the
+year's, counted below. Then come the days left in the year, and a countdown to
+whatever comes next.
 
 Everything runs on GitHub: Actions renders the images, Pages serves them, an iOS
 Shortcut sets one as your phone's wallpaper each morning, and a LaunchAgent does
@@ -160,6 +162,7 @@ conversation — "add the marathon on 1 November" is enough.
 {
   "years": [2026, 2027],
   "redactLabels": false,
+  "quarters": true,
   "layout": { "top": 1180, "shape": "circle", "markerScale": 1.2 },
   "footer": { "showYear": true, "maxMilestones": 12 },
   "desktop": {
@@ -176,7 +179,10 @@ conversation — "add the marathon on 1 November" is enough.
 }
 ```
 
-`layout.top` is the vertical offset of the grid in pixels. The default of 1180
+`layout.top` pins the block's top edge, the month labels' caps, 58px above that
+pixel, and the grid's top row starts 22px above it. Nothing stands over the
+months, so the grid stays there whatever is drawn: the quarters hang under it
+and push the count and the list down instead (see below). The default of 1180
 clears the widget stack on an iPhone 14 Pro Max; shift it if your lock screen is
 laid out differently. `markerScale` sizes milestone markers relative to the dot
 pitch.
@@ -193,28 +199,80 @@ Both desktops centre themselves the way a picture framer cuts a mat. With
 `"top": "auto"`, the space below the block is `balance` (1.25) times the space
 above it, so its centre sits just above the middle, where it reads as centred
 rather than sagging. It never starts higher than `safeTop`, the lock screen
-clock's limit, and never so low that the list loses a row. A number instead
-puts the grid's top row at that pixel. Both blocks are kept small and quiet,
-dots and type shrinking together down to the smallest type that still reads,
-so the negative space around them does the framing. The ultrawide's is sized
-to look like the MacBook's from where each is usually seen — the same visual
-angle, and the same share of the screen's height — rather than to fill as
-much of a screen whose sides are out in peripheral vision. `corners` draws
-faint corner marks one dot-pitch outside the block, that many pixels wide;
-`0` turns them off.
+clock's limit, and never so low that the list loses a row. A number instead pins
+the month labels' caps as it does on the phone, at the same distance scaled to
+the device's type: the grid's top row starts 19px above `top` on the MacBook and
+11px on the ultrawide, and the quarters push the count and the list down, not
+the grid. Both blocks are kept small and quiet, dots and type shrinking together
+down to the smallest type that still reads, so the negative space around them
+does the framing. The ultrawide's is sized to look like the MacBook's from where
+each is usually seen — the same visual angle, and the same share of the screen's
+height — rather than to fill as much of a screen whose sides are out in
+peripheral vision. `corners` draws faint corner marks one dot-pitch outside the
+block, that many pixels wide; `0` turns them off.
 
 A config made on the site or from the example before centring arrived pins
 `desktop.layout.top` to 620 (and `ultrawide.layout.top` to 333), which turns
 it off. `node scripts/events.mjs pull`, delete those keys from `config.json`,
 then `push`.
 
-Below the grid the year countdown comes first and carries the most weight, so a
-milestone number can never be misread as days left in the year. Beneath it every
-milestone is listed in calendar order — not by proximity — with past dates
-counting backwards (`-93`). The list trims itself to `footer.maxMilestones` and
-to whatever fits above `footer.safeBottom`, which keeps it clear of the lock
-screen controls. When it trims, the oldest past dates go first, so every
-upcoming milestone stays listed as long as there's room.
+The quarters sit under the grid: for each, a label over a bar that runs edge to
+edge with the grid, the four bars broken where the quarters turn. A quarter
+that's over is in the dim grey of a past milestone's count, label and bar. The
+one you're in is named in bold white, and its bar is lit white to the right edge
+of today's dot, since today counts as spent, and in a future day's grey beyond;
+the quarters to come are that grey under labels in the months' grey. After the
+current quarter's name, in the months' grey so the name leads, come the days
+left in it, counted as the footer counts the year's, today not among them:
+`Q3 · 47 DAYS LEFT`, `1 DAY LEFT` on its second-to-last day and `LAST DAY` on
+its last. Through Q4 those are the year's days left, which the year count just
+under the bars gives in bigger type, so Q4 is named alone until `Q4 · LAST DAY`
+on 31 December; with `footer.showYear` off there is no year count to defer to,
+and Q4 counts like the others. Where the count would come within two characters
+of the next label, or of the bar's end, it drops the word `DAYS`
+(`Q1 · 45 LEFT`). That only happens on the phone, in Q1 of a year that starts on
+a Monday and isn't a leap year (2029, 2035), whose Q1 is twelve columns wide.
+
+The month labels need no ticks: each is centred on the column its month starts
+in, and each quarter's label stands nearer its own bar than the grid, so every
+label reads as the grid's or its own bar's without a tick to say which. On the
+phone the months' baseline is 24px over the grid and the quarters' caps 24px
+under it, so the grid sits between its labels like a picture in a mat. Each
+quarter's bar is 12px under its label's baseline, and the year count's caps 56px
+under the bars, or 24px under the grid without them; the desktops scale them
+with their type. The bars break under APR, JUL and OCT, across the grid from
+them, in the columns they head.
+
+The bars break in the week column a quarter starts in, centred on it like the
+month labels. The days run down a column, not across it, so a break can be up to
+half a column from the exact day: a quarter that turns mid-week breaks in that
+week, one that starts on a Monday half a column late, one that starts on a
+Sunday over a third of a column early. A bar is lit as far as today's dot, so
+one whose last days share the next quarter's column is full from the first of
+them, and one that ends on a Sunday is still half a column short on its last
+day.
+
+With a numeric `top` the quarters push the count and the list down, not the
+grid, so the list has less room above `safeBottom`: on the phone it holds 19
+rows rather than 20 at the default `top`, in a 53-week year like 2026 and a
+54-week one like 2040 alike. That only matters with `maxMilestones` raised past
+19. With `"top": "auto"` they're part of the block that gets centred, inside the
+corner marks. `"quarters": false` leaves them off every screen, and in a
+device's `layout` leaves them off that one; like `top`, it isn't shared, so the
+top-level `layout` turns them off only on the phone.
+
+Below the grid and its quarters the year countdown comes first and carries the
+most weight, so a milestone number can never be misread as days left in the
+year: `89 DAYS LEFT`, `1 DAY LEFT` on 30 December and `0 DAYS LEFT` on the 31st.
+Today's date stands over `DAYS LEFT` in the months' grey, its caps level with
+the number's, so the two small lines are as tall as the big one and the date
+takes no line of its own. Nothing stands at the line's far end: the grid already
+shows how much of the year is gone. Beneath the count every milestone is listed
+in calendar order — not by proximity — with past dates counting backwards
+(`-93`). The list trims itself to `footer.maxMilestones` and to whatever fits
+above `footer.safeBottom`, which keeps it clear of the lock screen controls.
+When it trims, the oldest past dates go first, so every upcoming milestone stays
+listed as long as there's room.
 
 Emoji are Fluent Emoji 3D PNGs, because CI has no colour emoji font. Any of the
 ~1,600 emoji in `emoji/fluent-index.json` just works: if your config references

@@ -19,6 +19,7 @@ const esc = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
 // How the calendar looks, whatever it's drawn on.
 const STYLE = {
@@ -47,8 +48,9 @@ export const DEVICES = {
   // The desktops sit in a picture framer's mat: the bottom margin a quarter
   // larger than the top, so the block doesn't look to be sliding down
   // (framers weight the bottom 8-25%). That puts its centre just above the
-  // middle, where the eye reads it as centred. `safeTop` keeps the month
-  // labels below the lock screen clock; the block now sits well clear of it.
+  // middle, where the eye reads it as centred. `safeTop` keeps the block's top
+  // edge, the month labels' caps, below the lock screen clock; the block sits
+  // well clear of it.
   //
   // Both are small and quiet: dots and type shrink together, keeping the
   // pitch-to-type ratio that makes this the same design, down to the smallest
@@ -120,6 +122,15 @@ function buildYear(year, today) {
   })
   return days
 }
+
+// Where a mark `w` pixels wide that's lit as far as `exact` changes tone: the
+// nearest whole pixel that leaves neither part under 3px. Thinner reads as a
+// stray pixel rather than as the mark changing tone, so a part that would be
+// 1px or 2px goes to nothing or to 3px, whichever is nearer.
+const split = (exact, w) =>
+  [Math.round(exact), 0, 3, w - 3, w]
+    .filter((on) => on === 0 || on === w || (on >= 3 && on <= w - 3))
+    .reduce((a, b) => (Math.abs(b - exact) < Math.abs(a - exact) ? b : a))
 
 // A milestone's label is drawn as literal text in the wallpaper, which is served
 // publicly. `private: true` keeps the marker and the countdown but drops the words.
@@ -195,9 +206,40 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   const x0 = (W - gridW) / 2 + pitch / 2
   const gridH = 7 * pitch
 
+  // The month labels head the grid, their baseline px(24) over it, as far as
+  // the quarters' caps stand under it, so the grid sits between its labels
+  // like a picture in a mat. No ticks: each label is centred on the column its
+  // month starts in.
+  const over = px(24)
+
+  // Under the grid the year's quarters carry the progress on from the days to
+  // a longer span, before the footer: the grid and the bars under it read as
+  // one graphic, and the count and the list follow. The quarters' caps stand
+  // px(24) under the grid, as far as the months' baseline stands over it, and
+  // their bars px(12) under the labels' baseline, nearer than the grid, so
+  // each label reads as its own bar's without a tick to say which. Offsets
+  // are whole pixels from the grid's bottom edge, the one the month labels
+  // stand over at its top. The bars are px(3) tall, in whole pixels too.
+  // `quarters: false` leaves the quarters off every screen, and in a device's
+  // layout, off that one.
+  const quarters = config.quarters !== false && layout.quarters !== false
+  const qbar = quarters ? Math.round(over + px(20) * 0.73 + px(12)) : null
+  const barH = Math.max(1, Math.round(px(3)))
+  // The quarters' lowest edge under the grid's, or 0 without them.
+  const marks = quarters ? qbar + barH : 0
+  // The year count's baseline under the grid's top. With nothing under the
+  // grid its caps (0.73em) stand px(24) under it, as far as the months'
+  // baseline stands over it, and px(74) puts them there. The quarters take it
+  // down until its caps stand px(56) under their bars, further off than the
+  // quarters stand from the grid, so the bars stay the grid's and the count
+  // starts the numbers. They take it down in whole pixels, as they're drawn,
+  // so its type falls on the pixels just as it does without them. Everything
+  // under it moves down as far.
+  const countAt = gridH + px(74) + (marks && Math.round(marks + px(56) - over))
+
   // The block runs from the month labels' cap tops, this far above the grid
   // (JetBrains Mono's caps are 0.73em tall), to the last list row.
-  const above = px(46) + px(17) * 0.73
+  const above = over + px(17) * 0.73
 
   // `top: 'auto'` places the whole block so the space below it is `balance`
   // times the space above, and never starts above `safeTop`. The list holds
@@ -205,10 +247,9 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   // all year.
   const autoTop = () => {
     const rows = Math.ceil(Math.min(all.length, footer.maxMilestones) / listCols)
-    const yearLine = gridH + px(74)
-    const listFrom = footer.showYear ? yearLine + footer.gap : yearLine
-    const lastDot = gridH - pitch / 2 + r
-    const below = rows ? listFrom + (rows - 1) * px(46) : footer.showYear ? yearLine : lastDot
+    const listFrom = footer.showYear ? countAt + footer.gap : countAt
+    const lastMark = marks ? gridH + marks : gridH - pitch / 2 + r
+    const below = rows ? listFrom + (rows - 1) * px(46) : footer.showYear ? countAt : lastMark
     const balance = Number(layout.balance ?? 1)
     const space = (H - above - below) / (1 + (Number.isFinite(balance) && balance >= 0 ? balance : 1))
     // No lower than keeps the last list row above safeBottom, or the list would
@@ -218,18 +259,26 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
     const highest = Math.ceil(Number(layout.safeTop ?? 0) + above)
     return Math.max(highest, Math.min(Math.round(space + above), lowest))
   }
-  const y0 = layout.top === 'auto' ? autoTop() : layout.top
+  // A number pins the block's top edge, the month labels' caps: their baseline
+  // stands px(46) over it, which on a phone was chosen to keep the block under
+  // the clock and widgets. Nothing stands over the months, so the grid always
+  // starts px(46) less px(24), rounded, over `top`, 22px on the phone, with
+  // the quarters or without them; they push the count and the list down
+  // instead. So the preview's autoTop, JAN's baseline plus px(46), rounded,
+  // gives back the `top` that holds auto's placement.
+  const y0 = layout.top === 'auto' ? autoTop() : Number(layout.top) - Math.round(px(46) - over)
   const left = x0 - pitch / 2
   const right = x0 + gridW - pitch / 2
 
   const out = [`<rect width="${W}" height="${H}" fill="${THEME.bg}"/>`]
 
+  // The month labels head the block. JAN is the image's first text, which the
+  // preview measures `top` from (see y0), so nothing before it may be text.
   for (let m = 0; m < 12; m++) {
     const d = byDate.get(`${year}-${String(m + 1).padStart(2, '0')}-01`)
     const x = x0 + d.col * pitch
-    out.push(`<rect x="${(x - px(1)).toFixed(1)}" y="${y0 - px(34)}" width="${px(2)}" height="${px(12)}" fill="${THEME.future}"/>`)
     out.push(
-      `<text x="${x.toFixed(1)}" y="${y0 - px(46)}" font-family="JetBrains Mono" font-weight="500" font-size="${px(17)}" letter-spacing="${px(1.5)}" fill="${THEME.label}" text-anchor="middle">${MONTHS[m]}</text>`
+      `<text x="${x.toFixed(1)}" y="${(y0 - over).toFixed(1)}" font-family="JetBrains Mono" font-weight="500" font-size="${px(17)}" letter-spacing="${px(1.5)}" fill="${THEME.label}" text-anchor="middle">${MONTHS[m]}</text>`
     )
   }
 
@@ -267,34 +316,110 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
     )
   }
 
+  // ---- Marks --------------------------------------------------------------
+  // The quarters, hung from the grid's bottom edge (see qbar).
+
+  const edge = y0 + gridH
+  // The block's lowest edge or baseline so far, for the corner marks.
+  let bottom = edge - pitch / 2 + r
+
+  // The quarters: a bar under each label, from the column its quarter starts in
+  // to the column the next one does, centre to centre like the month labels,
+  // with a dot's gap at each turn. The days run down a column, not across it,
+  // so a quarter that turns mid-week, or on a Monday or a Sunday, breaks in
+  // that week's column, up to half a column from the exact day: half late for
+  // a Monday, over a third early for a Sunday. The outer ends are on the outer
+  // dots' outer edges, so the four still read as the year's one bar, and the
+  // breaks sit under APR, JUL and OCT, across the grid.
+  // One that's over is in the dim grey of a past milestone's count, label and
+  // bar; the one under way is lit white to the right edge of today's dot, as
+  // today counts as spent, and the rest of it, like the quarters to come, is in
+  // a future day's grey, under labels in the months' grey. So the only white
+  // under the grid, before the count, is the quarter you're in: its name, in
+  // bold, and how far through it you are. After the name, in the months' grey,
+  // come the days left in it, counted as the footer counts the year's, or on
+  // its last day, that it is.
+  if (quarters) {
+    const y = Math.round(edge + qbar)
+    // The ends in whole pixels: half the dots' width, rounded, out from the
+    // outer columns' centres. Where every column is centred on a whole pixel,
+    // as on both desktops in a 53-week year, the width is rounded to an even
+    // number, so the edge lands on a whole pixel without a second rounding.
+    // The right end mirrors the left.
+    const dotW = Number.isInteger(pitch) && Number.isInteger(x0) ? 2 * Math.round(r) : Math.round(2 * r)
+    const end = Math.round(x0 - dotW / 2)
+    const gap = Math.round(pitch - 2 * r)
+    const starts = ['01', '04', '07', '10'].map((m) => utc(`${year}-${m}-01`)).concat(utc(`${year + 1}-01-01`))
+    const turn = (q) => Math.round(x0 + byDate.get(iso(starts[q])).col * pitch)
+    const spent = x0 + byDate.get(iso(today)).col * pitch + r
+    // JetBrains Mono advances 0.6em per glyph plus the letter-spacing, as the
+    // footer's clip() assumes.
+    const cell = px(20) * 0.6 + px(2)
+    const bars = { [THEME.dim]: [], [THEME.past]: [], [THEME.future]: [] }
+    const bar = (fill, from, width) =>
+      width > 0 && bars[fill].push(`<rect x="${from}" y="${y}" width="${width}" height="${barH}"/>`)
+    const labels = []
+    for (let q = 0; q < 4; q++) {
+      const a = q === 0 ? end : turn(q) + Math.ceil(gap / 2)
+      const b = q === 3 ? W - end : turn(q + 1) - Math.floor(gap / 2)
+      const now = today >= starts[q] && today < starts[q + 1]
+      const done = today >= starts[q + 1]
+      // Never less than the 3px nub: on a quarter's first days the bar starts
+      // only a pixel or two short of the dot's edge, which split would round
+      // away, and today is spent.
+      const on = now ? Math.max(3, split(Math.min(b, Math.max(a, spent)) - a, b - a)) : done ? b - a : 0
+      bar(now ? THEME.past : THEME.dim, a, on)
+      bar(THEME.future, a + on, b - a - on)
+      // Through Q4 the days left in it are the year's, which the year's count
+      // under the bars gives in bigger type, so there the name stands alone
+      // until its last day. Without the year's count it counts like any other,
+      // so the number is never lost. The count stops two cells, a blank one
+      // more than a word space, short of the next label (past the gap at the
+      // turn) or of the bar's end, or it drops DAYS; on the phone a quarter can
+      // be twelve columns wide.
+      const n = Math.round((starts[q + 1] - DAY - today) / DAY)
+      const say = (unit) => (n ? `${n} ${unit}` : 'LAST DAY')
+      const long = say(n === 1 ? 'DAY LEFT' : 'DAYS LEFT')
+      const fits = (`Q${q + 1} · ${long}`.length + 2) * cell - px(2) <= (q === 3 ? b : b + gap) - a
+      const count = q === 3 && n && footer.showYear ? '' : ` · ${fits ? long : say('LEFT')}`
+      const text = now ? `<tspan font-weight="700" fill="${THEME.past}">Q${q + 1}</tspan>${count}` : `Q${q + 1}`
+      labels.push(
+        `<text x="${a}" y="${y - px(12)}" font-family="JetBrains Mono" font-weight="500" font-size="${px(20)}" letter-spacing="${px(2)}" fill="${done ? THEME.dim : THEME.label}">${text}</text>`
+      )
+    }
+    for (const [fill, rects] of Object.entries(bars)) rects.length && out.push(`<g fill="${fill}">${rects.join('')}</g>`)
+    out.push(...labels)
+    bottom = y + barH
+  }
+
   // ---- Footer -------------------------------------------------------------
   // The year count leads, then the full milestone list in calendar order.
 
   const daysTo = (m) => Math.round((utc(m.date) - today) / DAY)
-  let y = y0 + gridH + px(74)
-  // The block's lowest baseline so far, for the corner marks.
-  let bottom = y0 + gridH - pitch / 2 + r
+  let y = y0 + countAt
 
-  // The year countdown sits directly under the grid and carries the most
-  // weight, so a milestone's number can never be mistaken for it.
+  // The year countdown leads the footer and carries the most weight, so a
+  // milestone's number can never be mistaken for it.
   if (footer.showYear) {
-    const yearStart = utc(`${year}-01-01`)
-    const yearEnd = utc(`${year}-12-31`)
-    const pct = Math.round(((today - yearStart) / (yearEnd - yearStart)) * 100)
-    const daysLeft = Math.round((yearEnd - today) / DAY)
+    const daysLeft = Math.round((utc(`${year}-12-31`) - today) / DAY)
     const big = String(daysLeft)
+    const date = new Date(today)
+    const tx = left + big.length * px(41) + px(16)
 
     out.push(
       `<text x="${left.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="${px(68)}" letter-spacing="${px(-2)}" fill="${THEME.past}">${big}</text>`
     )
-    const tx = left + big.length * px(41) + px(16)
+    // Today's date is set into the count rather than beside it: over DAYS
+    // LEFT, its caps' top on the number's, so the two small lines fill the
+    // big one's height and the date adds no line and no column. Ten characters
+    // at most, it never runs past DAYS LEFT, and past DAY LEFT, on 30
+    // December, by about a character. Nothing answers it at the far edge: the
+    // grid is the year and shows how much of it is gone.
     out.push(
-      `<text x="${tx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="${px(28)}" letter-spacing="${px(3)}" fill="${THEME.past}">DAYS LEFT</text>`
+      `<text x="${tx.toFixed(1)}" y="${(y - (px(68) - px(24)) * 0.73).toFixed(1)}" font-family="JetBrains Mono" font-weight="500" font-size="${px(24)}" letter-spacing="${px(3)}" fill="${THEME.label}">${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}</text>`
     )
-    // Same baseline, opposite edge: the year and percentage read as context for
-    // the count rather than as a second line of it.
     out.push(
-      `<text x="${right.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="500" font-size="${px(24)}" letter-spacing="${px(3)}" fill="${THEME.dim}" text-anchor="end">IN ${year} · ${pct}%</text>`
+      `<text x="${tx.toFixed(1)}" y="${y}" font-family="JetBrains Mono" font-weight="700" font-size="${px(28)}" letter-spacing="${px(3)}" fill="${THEME.past}">${daysLeft === 1 ? 'DAY' : 'DAYS'} LEFT</text>`
     )
     bottom = y
     y += footer.gap

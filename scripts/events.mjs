@@ -158,6 +158,6 @@ switch (cmd) {
   }
 
   default:
-    console.error(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 14).join('\n'))
+    console.error(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 13).join('\n'))
     process.exit(1)
 }
