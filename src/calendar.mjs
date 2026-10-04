@@ -244,7 +244,7 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   const over = px(24)
 
   // Under the grid the progress marks run on from the days to longer spans,
-  // the year's quarters and then a life, before any number: the three read as
+  // the year's quarters and then a life, before the footer: the three read as
   // one graphic, the grid and two rules under it, and the count and the list
   // follow. Each mark stands further off than the one over it, so every label
   // reads as its own bar's without a tick to say which: the quarters' caps
@@ -366,7 +366,7 @@ export function renderSVG({ todayStr, config = {}, device = 'phone', sprites = {
   // that week's column, up to half a column from the exact day: half late for
   // a Monday, over a third early for a Sunday. The outer ends are on the outer
   // dots, like the life rule's, so the four still read as the year's one bar,
-  // and the breaks sit under JAN, APR, JUL and OCT, a grid's height above.
+  // and the breaks sit under APR, JUL and OCT, across the grid.
   // One that's over is in the dim grey of a life lived, label and bar; the one
   // under way is lit white to the right edge of today's dot, as today counts as
   // spent, and the rest of it, like the quarters to come, is in a future day's

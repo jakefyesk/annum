@@ -297,8 +297,7 @@ under it, so the grid sits between its labels like a picture in a mat. Each
 quarter's bar is 12px under its label's baseline, a birthday's rule 38px under
 the bars, and the year count's caps 56px under the lowest mark, or 24px under
 the grid with neither; the desktops scale them with their type. The bars break
-under JAN, APR, JUL and OCT, a grid's height below them, in the columns they
-head.
+under APR, JUL and OCT, across the grid from them, in the columns they head.
 
 The bars break in the week column a quarter starts in, centred on it like the
 month labels. The days run down a column, not across it, so a break can be up to
