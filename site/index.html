@@ -137,7 +137,7 @@
             <select id="shape"><option value="circle">circle</option><option value="square">square</option></select>
           </td></tr>
           <tr><td style="color:var(--dim)">Quarters</td><td>
-            <label class="priv"><input id="quarters" type="checkbox" checked autocomplete="off">Q1–Q4 OVER THE MONTHS</label>
+            <label class="priv"><input id="quarters" type="checkbox" checked autocomplete="off">Q1–Q4 UNDER THE GRID</label>
           </td></tr>
           <tr><td style="color:var(--dim)">Top offset</td><td>
             <input id="top" type="number" step="20" autocomplete="off" style="width:90px"> px
@@ -161,7 +161,7 @@
           </td></tr>
         </table>
         <p class="note">
-          A birthday adds a dashed rule over the grid, lit as far through a life as you are.
+          A birthday adds a dashed rule under the grid, lit as far through a life as you are.
           No date, age or percentage is drawn, but the lit length shows <strong>how much of your
           life you've lived</strong>, to within a month or two, nearly three on the ultrawide.
           And every day's image sits at a predictable URL beside today's, so anyone with the
@@ -327,18 +327,15 @@ const showTop = () => {
   $('#top').placeholder = String(DEVICES[device].layout.top)
   $('#top').value = $('#top').defaultValue = typeof state.top[device] === 'number' ? state.top[device] : ''
 }
-// The number that puts the block where auto did. A number pins the block's top
-// edge: the month labels' baseline stands px(46) over it, and a birthday or the
-// quarters push them a band or two lower, so it's px(46) under auto's month
-// labels, less the band. Their baseline is the y of the preview's first text,
-// the JAN label, which calendar.mjs keeps first; the band is the `data-band` on
-// its one group over the months, the quarters and the life's rule together, and
-// nothing when neither is drawn.
-const autoTop = (device) => {
-  const svg = $('#preview svg')
-  const band = Number(svg.querySelector('[data-band]')?.getAttribute('data-band') ?? 0)
-  return Math.round(+svg.querySelector('text').getAttribute('y') + Math.round(46 * DEVICES[device].layout.scale * 10) / 10) - band
-}
+// The number that puts the block where auto did. A number pins the month
+// labels' caps, the block's top edge, over it: the grid starts round(px(46) −
+// px(24)) over the number, and the labels' baseline px(24) over the grid,
+// whatever else is drawn, since a birthday and the quarters hang under the
+// grid. That baseline is the y of the preview's first text, the JAN label,
+// which calendar.mjs keeps first, so round(JAN's y + px(46)) is the number
+// that holds auto's placement.
+const autoTop = (device) =>
+  Math.round(+$('#preview svg text').getAttribute('y') + Math.round(46 * DEVICES[device].layout.scale * 10) / 10)
 $('#device').oninput = () => { showTop(); draw() }
 $('#top').oninput = () => {
   const device = $('#device').value

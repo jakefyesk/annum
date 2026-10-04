@@ -3,15 +3,15 @@
 A year, one dot at a time.
 
 A lock screen wallpaper — with matching desktops for a MacBook Pro 14″ and an
-ultrawide monitor — that renders the current year as a horizontal dot grid: seven
-rows tall, read left to right, so it scans like a progress bar rather than a
-calendar. Significant dates become
-emoji markers, date ranges tint their dots, and the footer counts down to whatever
-comes next. Over the month labels, a bar for each quarter breaks the year into
-four, and the one you're in counts down its own days, except Q4, whose days left
-are the year's, counted under the grid. A birthday adds a faint dashed rule
-above it all, as wide as the year, that fills over a life the way the grid does
-over a year.
+ultrawide monitor — that renders the current year as a horizontal dot grid:
+seven rows tall, read left to right, so it scans like a progress bar rather than
+a calendar. Significant dates become emoji markers and date ranges tint their
+dots. Under the grid, a bar for each quarter breaks the year into four, and the
+one you're in counts down its own days, except Q4, whose days left are the
+year's, counted below. Under those, a birthday adds a faint dashed rule, as wide
+as the year, that fills over a life the way the grid does over a year. Only then
+come the numbers: the days left in the year, and a countdown to whatever comes
+next.
 
 Everything runs on GitHub: Actions renders the images, Pages serves them, an iOS
 Shortcut sets one as your phone's wallpaper each morning, and a LaunchAgent does
@@ -203,11 +203,11 @@ one, whatever is set stays. `birthday off` removes both.
 }
 ```
 
-`layout.top` pins the block's top edge 58px above that pixel, whatever stands
-there: the month labels, or over them the quarters' labels or a birthday's
-rule. Those two each take a band that pushes the grid down rather than the
-block up (see below); with neither, the grid's top row starts 22px above
-`top`. The default of 1180 clears the widget stack on an iPhone 14 Pro Max;
+`layout.top` pins the block's top edge, the month labels' caps, 58px above that
+pixel, and the grid's top row starts 22px above it. Nothing stands over the
+months, so the grid stays there whatever is drawn: the quarters and a
+birthday's rule hang under it and push the count and the list down instead (see
+below). The default of 1180 clears the widget stack on an iPhone 14 Pro Max;
 shift it if your lock screen is laid out differently. `markerScale` sizes
 milestone markers relative to the dot pitch.
 
@@ -224,8 +224,10 @@ Both desktops centre themselves the way a picture framer cuts a mat. With
 above it, so its centre sits just above the middle, where it reads as centred
 rather than sagging. It never starts higher than `safeTop`, the lock screen
 clock's limit, and never so low that the list loses a row. A number instead
-pins the block's top edge as it does on the phone, at the same distance scaled
-to the device's type. Both
+pins the month labels' caps as it does on the phone, at the same distance scaled
+to the device's type: the grid's top row starts 19px above `top` on the MacBook
+and 11px on the ultrawide, and the quarters and a birthday's rule push the count
+and the list down, not the grid. Both
 blocks are kept small and quiet, dots and type shrinking together down to the
 smallest type that still reads, so the negative space around them does the
 framing. The ultrawide's is sized
@@ -240,44 +242,46 @@ A config made on the site or from the example before centring arrived pins
 it off. `node scripts/events.mjs pull`, delete those keys from `config.json`,
 then `push`.
 
-`birthday` adds a dashed rule above the month labels for a life of
-`lifeExpectancy` years (rounded, 1 to 150; 75 otherwise). It's drawn in the
-grid's rhythm: a dash on each week column, as wide as that column's dots, so it
-runs edge to edge with the grid and a year and a life read at the same length.
-Each dash holds an equal share of the life. The share lived is in the dim grey
-of a past milestone's count, the rest in a future day's grey, and the dash
-where they meet is split between the two to the nearest pixel, except that
-neither part is left under 3px, which would read as a stray pixel rather than
-as the rule changing tone: a part that would be thinner goes to nothing or to
-3px, whichever is nearer. It doesn't snap to whole dashes, which would hold it
-still for a dash's share of the life, nearly a year and a half at 75. It
-carries no text and no red. Past the life's end the rule is all lit.
+`birthday` adds a dashed rule under the grid, below the quarters when they're
+drawn, for a life of `lifeExpectancy` years (rounded, 1 to 150; 75 otherwise).
+It's drawn in the grid's rhythm: a dash on each week column, as wide as that
+column's dots, so it runs edge to edge with the grid and a year and a life read
+at the same length. Each dash holds an equal share of the life. The share lived
+is in the dim grey of a past milestone's count, the rest in a future day's grey,
+and the dash where they meet is split between the two to the nearest pixel,
+except that neither part is left under 3px, which would read as a stray pixel
+rather than as the rule changing tone: a part that would be thinner goes to
+nothing or to 3px, whichever is nearer. It doesn't snap to whole dashes, which
+would hold it still for a dash's share of the life, nearly a year and a half
+at 75. It carries no text and no red. Past the life's end the rule is all lit.
 
-The rule takes a band above the month labels, on the phone 38px over their caps,
-where the quarters' bars would stand, or above the quarters, 56px over their
-labels: half as far again as their bars stand over the months, so it doesn't
-read as one more bar. With a numeric `top` the block's top edge stays put — on
-the phone, clear of the clock and widgets — and the band pushes the grid and
-everything under it down, so the list has less room above `safeBottom`: on the
-phone, one row less (18 rather than 19 at the default `top`, or 19 rather than
-20 without the quarters), which only matters with `maxMilestones` raised
-past 18. Without the quarters it costs none in a 54-week year, whose dots are
-smaller (the next is 2040). With `"top": "auto"` the band is part of the block
-that gets centred, inside the corner marks. `"life": false` in a device's
-`layout` leaves the rule off that screen; like `top`, it isn't shared, because
-the top-level `layout` is the phone's own. See Privacy before adding a birthday.
+On the phone the rule stands 38px under the quarters' bars, half as far again
+as their labels stand under the grid, so it doesn't read as one more bar.
+Without the quarters it takes their labels' place, 24px under the grid, as far
+as the month labels' baseline stands over it: there it reads as the grid's, with
+the year count more than twice as far below it, where 38px would leave it
+hanging nearly midway between the two. With a numeric `top` the grid stays put —
+on the phone, under the clock and widgets — and the rule pushes the count and
+the list down, so the list has less room above `safeBottom`: on the phone, one
+row less, 18 rather than 19 at the default `top`, or 19 rather than 20 without
+the quarters, in a 53-week year like 2026 and a 54-week one like 2040 alike.
+That only matters with `maxMilestones` raised past 18. With `"top": "auto"` the
+rule is part of the block that gets centred, inside the corner marks.
+`"life": false` in a device's `layout` leaves the rule off that screen; like
+`top`, it isn't shared, because the top-level `layout` is the phone's own. See
+Privacy before adding a birthday.
 
-The quarters sit between the life's rule and the month labels: for each, a
-label over a bar that runs edge to edge with the grid, the four bars broken
-where the quarters turn. A quarter that's over is in the dim grey of a life
-lived, label and bar. The one you're in is named in bold white, and its bar is
-lit white to the right edge of today's dot, since today counts as spent, and in
-a future day's grey beyond; the quarters to come are that grey under labels in
-the months' grey. After the current quarter's name, in the months' grey so the
-name leads, come the days left in it, counted as the footer counts the year's,
-today not among them: `Q3 · 47 DAYS LEFT`, `1 DAY LEFT` on its second-to-last
-day and `LAST DAY` on its last. Through Q4 those are the year's days left,
-which the footer counts just under the grid, so Q4 is named alone until
+The quarters sit under the grid, over a birthday's rule: for each, a label over
+a bar that runs edge to edge with the grid, the four bars broken where the
+quarters turn. A quarter that's over is in the dim grey of a life lived, label
+and bar. The one you're in is named in bold white, and its bar is lit white to
+the right edge of today's dot, since today counts as spent, and in a future
+day's grey beyond; the quarters to come are that grey under labels in the
+months' grey. After the current quarter's name, in the months' grey so the name
+leads, come the days left in it, counted as the footer counts the year's, today
+not among them: `Q3 · 47 DAYS LEFT`, `1 DAY LEFT` on its second-to-last day and
+`LAST DAY` on its last. Through Q4 those are the year's days left, which the
+year count just under the marks gives in bigger type, so Q4 is named alone until
 `Q4 · LAST DAY` on 31 December; with `footer.showYear` off there is no year
 count to defer to, and Q4 counts like the others. Where the count would come
 within two characters of the next label, or of the bar's end, it drops the word
@@ -286,12 +290,15 @@ starts on a Monday and isn't a leap year (2029, 2035), whose Q1 is twelve
 columns wide.
 
 The month labels need no ticks: each is centred on the column its month starts
-in, and each span stands further off than the one it holds, so every label reads
-as the grid's or its own bar's without a tick to say which. On the phone the
-months' baseline is 24px over the grid, as far as the year count's caps stand
-under it, the quarters' bars 38px over the months' caps, and a birthday's rule
-56px over the quarters' labels; the desktops scale them with their type. The
-bars' breaks over JAN, APR, JUL and OCT carry each turn down to its column.
+in, and each mark under the grid stands further off than the one over it, so
+every label reads as the grid's or its own bar's without a tick to say which. On
+the phone the months' baseline is 24px over the grid and the quarters' caps 24px
+under it, so the grid sits between its labels like a picture in a mat. Each
+quarter's bar is 12px under its label's baseline, a birthday's rule 38px under
+the bars, and the year count's caps 56px under the lowest mark, or 24px under
+the grid with neither; the desktops scale them with their type. The bars break
+under JAN, APR, JUL and OCT, a grid's height below them, in the columns they
+head.
 
 The bars break in the week column a quarter starts in, centred on it like the
 month labels. The days run down a column, not across it, so a break can be up to
@@ -302,28 +309,27 @@ one whose last days share the next quarter's column is full from the first of
 them, and one that ends on a Sunday is still half a column short on its last
 day.
 
-The quarters take a band of their own, and with a numeric `top` it pushes the
-grid down as the life's rule does: on the phone the list holds 19 rows rather
-than 20 at the default `top`, or 18 rather than 19 with a birthday (20 in a
-54-week year). With `"top": "auto"` the band is part of the block that gets
-centred. `"quarters": false` leaves them off every screen, and in a device's
-`layout` leaves them off that one; like `life`, it isn't shared, so the
-top-level `layout` turns them off only on the phone. Off, the month labels are
-the block's top edge, or a birthday's rule stands over them where the bars would
-be.
+With a numeric `top` the quarters push the count and the list down as the
+life's rule does, not the grid: on the phone the list holds 19 rows rather than
+20 at the default `top`, or 18 rather than 19 with a birthday, in 2026 and 2040
+alike. With `"top": "auto"` they're part of the block that gets centred.
+`"quarters": false` leaves them off every screen, and in a device's `layout`
+leaves them off that one; like `life`, it isn't shared, so the top-level
+`layout` turns them off only on the phone. Off, a birthday's rule takes their
+labels' place under the grid.
 
-Below the grid the year countdown comes first and carries the most weight, so a
-milestone number can never be misread as days left in the year: `89 DAYS LEFT`,
-`1 DAY LEFT` on 30 December and `0 DAYS LEFT` on the 31st. Today's date stands
-over `DAYS LEFT` in the months' grey, its caps level with the number's, so the
-two small lines are as tall as the big one and the date takes no line of its
-own. Nothing stands at the line's far end: the grid already shows how much of
-the year is gone. Beneath the count every milestone is listed in calendar order
-— not by proximity — with past dates counting backwards (`-93`). The list trims
-itself to `footer.maxMilestones` and to whatever fits above `footer.safeBottom`,
-which keeps it clear of the lock screen controls. When it trims, the oldest past
-dates go first, so every upcoming milestone stays listed as long as there's
-room.
+Below the grid and its marks the year countdown comes first and carries the most
+weight, so a milestone number can never be misread as days left in the year:
+`89 DAYS LEFT`, `1 DAY LEFT` on 30 December and `0 DAYS LEFT` on the 31st.
+Today's date stands over `DAYS LEFT` in the months' grey, its caps level with
+the number's, so the two small lines are as tall as the big one and the date
+takes no line of its own. Nothing stands at the line's far end: the grid already
+shows how much of the year is gone. Beneath the count every milestone is listed
+in calendar order — not by proximity — with past dates counting backwards
+(`-93`). The list trims itself to `footer.maxMilestones` and to whatever fits
+above `footer.safeBottom`, which keeps it clear of the lock screen controls.
+When it trims, the oldest past dates go first, so every upcoming milestone stays
+listed as long as there's room.
 
 Emoji are Fluent Emoji 3D PNGs, because CI has no colour emoji font. Any of the
 ~1,600 emoji in `emoji/fluent-index.json` just works: if your config references
